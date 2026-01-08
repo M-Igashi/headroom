@@ -59,19 +59,89 @@ subfolder/track03.flac -12.0      -4.0 dBTP      +3.0 dB
 
 ## Installation
 
-### Homebrew (macOS)
+### macOS (Homebrew)
 
 ```bash
 brew tap M-Igashi/tap
 brew install headroom
 ```
 
-### Requirements
+This automatically installs ffmpeg as a dependency.
 
-- **ffmpeg** is required for audio analysis and processing
+### Windows
+
+#### Prerequisites
+
+1. **Install ffmpeg** (required for audio analysis)
+
+   Using winget:
+   ```powershell
+   winget install ffmpeg
+   ```
+
+   Or using Chocolatey:
+   ```powershell
+   choco install ffmpeg
+   ```
+
+   Or download manually from [ffmpeg.org](https://ffmpeg.org/download.html) and add to PATH.
+
+2. **Install Rust** (required to build from source)
+
+   Download and run the installer from [rustup.rs](https://rustup.rs/)
+
+#### Build from Source
+
+```powershell
+# Clone the repository
+git clone https://github.com/M-Igashi/headroom.git
+cd headroom
+
+# Build release binary
+cargo build --release
+
+# The binary will be at target\release\headroom.exe
+```
+
+#### Add to PATH (optional)
+
+To run `headroom` from any directory, add it to your PATH:
+
+```powershell
+# Copy to a directory in your PATH, or add the build directory to PATH
+copy target\release\headroom.exe C:\Users\YourName\bin\
+```
+
+Or add `C:\path\to\headroom\target\release` to your system PATH environment variable.
+
+### Linux
+
+#### Prerequisites
 
 ```bash
-brew install ffmpeg
+# Ubuntu/Debian
+sudo apt install ffmpeg
+
+# Fedora
+sudo dnf install ffmpeg
+
+# Arch
+sudo pacman -S ffmpeg
+```
+
+#### Build from Source
+
+```bash
+# Install Rust if not already installed
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Clone and build
+git clone https://github.com/M-Igashi/headroom.git
+cd headroom
+cargo build --release
+
+# Install to local bin
+cp target/release/headroom ~/.local/bin/
 ```
 
 ## Usage
@@ -81,6 +151,12 @@ brew install ffmpeg
 cd ~/Music/DJ-Tracks
 
 # Run headroom
+headroom
+```
+
+On Windows:
+```powershell
+cd C:\Users\YourName\Music\DJ-Tracks
 headroom
 ```
 
@@ -134,3 +210,7 @@ Backups preserve the original directory structure:
 ## License
 
 MIT
+
+## Author
+
+Masanari Higashi
