@@ -9,6 +9,13 @@ pub fn scan_audio_files(dir: &Path) -> Vec<PathBuf> {
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file())
         .filter(|e| {
+            // Skip macOS AppleDouble/resource fork files
+            let filename = e.file_name().to_string_lossy();
+            if filename.starts_with("._") {
+                return false;
+            }
+            
+            // Check extension
             e.path()
                 .extension()
                 .and_then(|ext| ext.to_str())
