@@ -1,0 +1,35 @@
+[package]
+name = "headroom"
+version = "0.1.0"
+edition = "2021"
+authors = ["Masanari Higashi"]
+description = "Audio loudness analyzer and gain adjustment tool for mastering workflows"
+license = "MIT"
+repository = "https://github.com/M-Igashi/headroom"
+keywords = ["audio", "loudness", "lufs", "mastering", "ffmpeg"]
+categories = ["command-line-utilities", "multimedia::audio"]
+
+[dependencies]
+# CLI interaction
+dialoguer = "0.11"
+console = "0.15"
+indicatif = "0.17"
+
+# Data handling
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+csv = "1.3"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# File system
+walkdir = "2.4"
+chrono = "0.4"
+shellexpand = "3.1"
+
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1

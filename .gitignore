@@ -25,3 +25,8 @@ Thumbs.db
 # Test outputs
 *.csv
 backup/
+
+
+# Added by cargo
+
+/target
