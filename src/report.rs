@@ -35,9 +35,7 @@ pub fn print_table(analyses: &[AudioAnalysis]) {
     use console::Style;
     
     let header_style = Style::new().bold().cyan();
-    let positive_style = Style::new().green();
-    let negative_style = Style::new().red();
-    let neutral_style = Style::new().dim();
+    let value_style = Style::new().green();
     
     // Calculate column widths
     let filename_width = analyses
@@ -50,54 +48,26 @@ pub fn print_table(analyses: &[AudioAnalysis]) {
     // Print header
     println!();
     println!(
-        "{} {:>8} {:>12} {:>10}",
+        "{} {:>8} {:>12} {:>12}",
         header_style.apply_to(format!("{:<width$}", "Filename", width = filename_width)),
         header_style.apply_to("LUFS"),
         header_style.apply_to("True Peak"),
         header_style.apply_to("Headroom"),
     );
-    println!("{}", "─".repeat(filename_width + 8 + 12 + 10 + 6));
+    println!("{}", "─".repeat(filename_width + 8 + 12 + 12 + 6));
     
     // Print rows
     for analysis in analyses {
         let headroom_str = format!("{:+.1} dB", analysis.headroom);
-        let headroom_styled = if analysis.headroom > 0.0 {
-            positive_style.apply_to(headroom_str)
-        } else if analysis.headroom < 0.0 {
-            negative_style.apply_to(headroom_str)
-        } else {
-            neutral_style.apply_to(headroom_str)
-        };
         
         println!(
-            "{:<width$} {:>8.1} {:>10.1} dBTP {:>10}",
+            "{:<width$} {:>8.1} {:>10.1} dBTP {:>12}",
             analysis.filename,
             analysis.input_i,
             analysis.input_tp,
-            headroom_styled,
+            value_style.apply_to(headroom_str),
             width = filename_width,
         );
     }
     println!();
-}
-
-pub fn print_summary(analyses: &[AudioAnalysis]) {
-    use console::Style;
-    
-    let info_style = Style::new().cyan();
-    
-    let positive_count = analyses.iter().filter(|a| a.headroom > 0.0).count();
-    let negative_count = analyses.iter().filter(|a| a.headroom < 0.0).count();
-    let zero_count = analyses.iter().filter(|a| a.headroom == 0.0).count();
-    
-    println!(
-        "{} {} files with positive headroom (can be boosted)",
-        info_style.apply_to("▸"),
-        positive_count
-    );
-    println!(
-        "{} {} files already at or above -1 dBTP",
-        info_style.apply_to("▸"),
-        negative_count + zero_count
-    );
 }
