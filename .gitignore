@@ -26,6 +26,9 @@ Thumbs.db
 *.csv
 backup/
 
+# Release artifacts
+dist/
+
 
 # Added by cargo
 
