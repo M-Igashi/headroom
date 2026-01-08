@@ -210,7 +210,3 @@ Backups preserve the original directory structure:
 ## License
 
 MIT
-
-## Author
-
-Masanari Higashi
