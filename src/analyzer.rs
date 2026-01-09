@@ -3,94 +3,52 @@ use serde::Deserialize;
 use std::path::Path;
 use std::process::Command;
 
-/// True Peak ceiling for high bitrate files (>= 256 kbps)
-/// Based on AES TD1008: "High rate (e.g., 256 kbps) coders may work satisfactorily with as little as −0.5 dB TP"
-const TARGET_TRUE_PEAK_HIGH_BITRATE: f64 = -0.5;
+use crate::scanner;
 
-/// True Peak ceiling for low bitrate files (< 256 kbps) or unknown bitrate
-/// More conservative to account for codec overshoot in lower bitrate encoding
-const TARGET_TRUE_PEAK_LOW_BITRATE: f64 = -1.0;
+/// True Peak ceiling for lossless files (FLAC, AIFF, WAV)
+/// Based on AES TD1008: high-rate codecs work satisfactorily with -0.5 dBTP
+const TARGET_TRUE_PEAK_LOSSLESS: f64 = -0.5;
 
-/// Bitrate threshold in kbps
-const HIGH_BITRATE_THRESHOLD: u32 = 256;
+/// True Peak ceiling for MP3 files
+/// More conservative due to lossy format characteristics
+const TARGET_TRUE_PEAK_MP3: f64 = -1.0;
+
+/// MP3 gain step size in dB (fixed by MP3 format specification)
+pub const MP3_GAIN_STEP: f64 = 1.5;
 
 #[derive(Debug, Clone)]
 pub struct AudioAnalysis {
     pub filename: String,
-    pub input_i: f64,      // Integrated loudness (LUFS)
-    pub input_tp: f64,     // True peak (dBTP)
-    pub headroom: f64,     // Available gain (dB)
-    pub target_tp: f64,    // Target True Peak ceiling (dBTP)
-    pub bit_rate_kbps: Option<u32>, // Detected bitrate (kbps)
+    pub path: std::path::PathBuf,
+    pub input_i: f64,           // Integrated loudness (LUFS)
+    pub input_tp: f64,          // True peak (dBTP)
+    pub headroom: f64,          // Available gain (dB)
+    pub target_tp: f64,         // Target True Peak ceiling (dBTP)
+    pub is_mp3: bool,           // Whether file is MP3
+    pub effective_gain: f64,    // Actual gain to apply (for MP3: rounded to 1.5dB steps)
+    pub mp3_gain_steps: i32,    // For MP3: number of gain steps to apply
 }
 
 #[derive(Debug, Deserialize)]
 struct LoudnormOutput {
     input_i: String,
     input_tp: String,
+    #[allow(dead_code)]
     input_lra: String,
+    #[allow(dead_code)]
     input_thresh: String,
+    #[allow(dead_code)]
     output_i: String,
+    #[allow(dead_code)]
     output_tp: String,
+    #[allow(dead_code)]
     output_lra: String,
+    #[allow(dead_code)]
     output_thresh: String,
+    #[allow(dead_code)]
     normalization_type: String,
+    #[allow(dead_code)]
     target_offset: String,
-}
-
-/// Get audio bitrate using ffprobe
-fn get_bitrate(path: &Path) -> Option<u32> {
-    let output = Command::new("ffprobe")
-        .args([
-            "-v", "quiet",
-            "-select_streams", "a:0",
-            "-show_entries", "stream=bit_rate",
-            "-of", "csv=p=0",
-            path.to_str()?,
-        ])
-        .output()
-        .ok()?;
-    
-    if !output.status.success() {
-        return None;
-    }
-    
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let bit_rate_str = stdout.trim();
-    
-    // ffprobe returns bit_rate in bps, convert to kbps
-    if let Ok(bps) = bit_rate_str.parse::<u64>() {
-        Some((bps / 1000) as u32)
-    } else {
-        // For some lossless formats, ffprobe may not report bitrate
-        // In that case, we assume high quality and use aggressive ceiling
-        None
-    }
-}
-
-/// Determine target True Peak ceiling based on bitrate
-fn get_target_true_peak(bit_rate_kbps: Option<u32>, extension: &str) -> f64 {
-    // Lossless formats (FLAC, AIFF, WAV) are always high quality
-    // They will typically be transcoded to high-bitrate lossy formats
-    let is_lossless = matches!(
-        extension.to_lowercase().as_str(),
-        "flac" | "aiff" | "aif" | "wav"
-    );
-    
-    if is_lossless {
-        // Lossless files: use aggressive ceiling (-0.5 dBTP)
-        // Rationale: These are master-quality files that will be
-        // distributed via high-bitrate streaming (Spotify Premium 320kbps,
-        // Apple Music 256kbps AAC, etc.)
-        return TARGET_TRUE_PEAK_HIGH_BITRATE;
-    }
-    
-    // For lossy formats, check actual bitrate
-    match bit_rate_kbps {
-        Some(kbps) if kbps >= HIGH_BITRATE_THRESHOLD => TARGET_TRUE_PEAK_HIGH_BITRATE,
-        Some(_) => TARGET_TRUE_PEAK_LOW_BITRATE,
-        None => TARGET_TRUE_PEAK_LOW_BITRATE, // Unknown bitrate: be conservative
-    }
 }
 
 pub fn analyze_file(path: &Path) -> Result<AudioAnalysis> {
@@ -126,15 +84,25 @@ pub fn analyze_file(path: &Path) -> Result<AudioAnalysis> {
     let input_tp: f64 = loudnorm.input_tp.parse()
         .context("Failed to parse input_tp")?;
     
-    // Get bitrate and determine target ceiling
-    let bit_rate_kbps = get_bitrate(path);
-    let extension = path
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("");
-    let target_tp = get_target_true_peak(bit_rate_kbps, extension);
+    let is_mp3 = scanner::is_mp3(path);
+    
+    // Determine target ceiling based on format
+    let target_tp = if is_mp3 {
+        TARGET_TRUE_PEAK_MP3
+    } else {
+        TARGET_TRUE_PEAK_LOSSLESS
+    };
     
     let headroom = target_tp - input_tp;
+    
+    // Calculate effective gain (for MP3, round down to 1.5dB steps)
+    let (effective_gain, mp3_gain_steps) = if is_mp3 {
+        let steps = (headroom / MP3_GAIN_STEP).floor() as i32;
+        let effective = steps as f64 * MP3_GAIN_STEP;
+        (effective, steps)
+    } else {
+        (headroom, 0)
+    };
 
     let filename = path
         .file_name()
@@ -144,11 +112,14 @@ pub fn analyze_file(path: &Path) -> Result<AudioAnalysis> {
 
     Ok(AudioAnalysis {
         filename,
+        path: path.to_path_buf(),
         input_i,
         input_tp,
         headroom,
         target_tp,
-        bit_rate_kbps,
+        is_mp3,
+        effective_gain,
+        mp3_gain_steps,
     })
 }
 
@@ -157,5 +128,13 @@ pub fn check_ffmpeg() -> Result<()> {
         .arg("-version")
         .output()
         .context("ffmpeg not found. Please install ffmpeg first.")?;
+    Ok(())
+}
+
+pub fn check_mp3gain() -> Result<()> {
+    Command::new("mp3gain")
+        .arg("-v")
+        .output()
+        .context("mp3gain not found. Please install mp3gain first (brew install mp3gain).")?;
     Ok(())
 }
