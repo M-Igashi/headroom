@@ -37,7 +37,8 @@ pub fn backup_file(file_path: &Path, base_dir: &Path, backup_dir: &Path) -> Resu
     Ok(backup_path)
 }
 
-pub fn apply_gain(file_path: &Path, gain_db: f64) -> Result<()> {
+/// Apply gain to lossless files using ffmpeg
+pub fn apply_gain_ffmpeg(file_path: &Path, gain_db: f64) -> Result<()> {
     // Create temp file with same extension
     let extension = file_path
         .extension()
@@ -89,6 +90,32 @@ pub fn apply_gain(file_path: &Path, gain_db: f64) -> Result<()> {
     Ok(())
 }
 
+/// Apply gain to MP3 files using mp3gain (lossless, 1.5dB steps)
+pub fn apply_gain_mp3gain(file_path: &Path, gain_steps: i32) -> Result<()> {
+    if gain_steps == 0 {
+        return Ok(());
+    }
+    
+    let output = Command::new("mp3gain")
+        .args([
+            "-c",  // Ignore clipping warning
+            "-p",  // Preserve original timestamp
+            "-g",  // Apply gain
+            &gain_steps.to_string(),
+            file_path.to_str().ok_or_else(|| anyhow!("Invalid path"))?,
+        ])
+        .output()
+        .context("Failed to execute mp3gain")?;
+    
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        return Err(anyhow!("mp3gain failed: {} {}", stderr, stdout));
+    }
+    
+    Ok(())
+}
+
 pub fn process_file(
     file_path: &Path,
     analysis: &AudioAnalysis,
@@ -100,6 +127,12 @@ pub fn process_file(
         error: None,
     };
     
+    // Skip if no effective gain to apply
+    if analysis.effective_gain <= 0.0 {
+        result.success = true;
+        return result;
+    }
+    
     // Backup if requested
     if let Some(backup) = backup_dir {
         if let Err(e) = backup_file(file_path, base_dir, backup) {
@@ -108,8 +141,14 @@ pub fn process_file(
         }
     }
     
-    // Apply gain
-    match apply_gain(file_path, analysis.headroom) {
+    // Apply gain based on file type
+    let apply_result = if analysis.is_mp3 {
+        apply_gain_mp3gain(file_path, analysis.mp3_gain_steps)
+    } else {
+        apply_gain_ffmpeg(file_path, analysis.effective_gain)
+    };
+    
+    match apply_result {
         Ok(()) => result.success = true,
         Err(e) => {
             result.error = Some(format!("Gain adjustment failed: {}", e));

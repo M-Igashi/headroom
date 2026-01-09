@@ -4,7 +4,7 @@ use dialoguer::{Confirm, theme::ColorfulTheme};
 use indicatif::{ProgressBar, ProgressStyle};
 use std::path::PathBuf;
 
-use crate::analyzer::{self, AudioAnalysis};
+use crate::analyzer::{self, AudioAnalysis, MP3_GAIN_STEP};
 use crate::processor;
 use crate::report;
 use crate::scanner;
@@ -25,18 +25,31 @@ pub fn run() -> Result<()> {
         style(target_dir.display()).bold()
     );
     
-    // Confirm to proceed
-    if !Confirm::with_theme(&ColorfulTheme::default())
-        .with_prompt("Scan this directory?")
-        .default(true)
-        .interact()?
-    {
-        println!("Cancelled.");
-        return Ok(());
+    // Ask about MP3 support
+    let include_mp3 = Confirm::with_theme(&ColorfulTheme::default())
+        .with_prompt("Include MP3 files? (uses mp3gain, 1.5dB steps)")
+        .default(false)
+        .interact()?;
+    
+    // Check mp3gain if needed
+    if include_mp3 {
+        if let Err(_) = analyzer::check_mp3gain() {
+            println!(
+                "\n{} mp3gain not found. Install with: {}",
+                style("⚠").yellow(),
+                style("brew install mp3gain").cyan()
+            );
+            println!("  Continuing without MP3 support...\n");
+            return run_scan(&target_dir, false);
+        }
     }
     
+    run_scan(&target_dir, include_mp3)
+}
+
+fn run_scan(target_dir: &std::path::Path, include_mp3: bool) -> Result<()> {
     // Scan for audio files
-    let files = scanner::scan_audio_files(&target_dir);
+    let files = scanner::scan_audio_files(target_dir, include_mp3);
     
     if files.is_empty() {
         println!(
@@ -45,7 +58,7 @@ pub fn run() -> Result<()> {
         );
         println!(
             "  Supported formats: {}",
-            scanner::get_supported_extensions().join(", ")
+            scanner::get_supported_extensions(include_mp3).join(", ")
         );
         return Ok(());
     }
@@ -59,19 +72,27 @@ pub fn run() -> Result<()> {
     // Analyze files
     let all_analyses = analyze_files(&files)?;
     
-    // Filter to only files with positive headroom
+    // Filter to only files with positive effective gain
+    // (for MP3, effective_gain is already rounded down to 1.5dB steps)
     let processable: Vec<_> = all_analyses
         .iter()
         .enumerate()
-        .filter(|(_, a)| a.headroom > 0.0)
+        .filter(|(_, a)| a.effective_gain > 0.0)
         .collect();
     
     if processable.is_empty() {
         println!(
-            "\n{} No files with positive headroom found.",
+            "\n{} No files with enough headroom found.",
             style("ℹ").blue()
         );
         println!("  All files are already at or above the target ceiling.");
+        if include_mp3 {
+            println!(
+                "  {} MP3 files require at least {:.1} dB headroom (1.5dB steps)",
+                style("ℹ").dim(),
+                MP3_GAIN_STEP
+            );
+        }
         return Ok(());
     }
     
@@ -85,7 +106,7 @@ pub fn run() -> Result<()> {
     report::print_table(&processable_analyses);
     
     // Always export CSV
-    let csv_path = report::generate_csv(&processable_analyses, &target_dir)?;
+    let csv_path = report::generate_csv(&processable_analyses, target_dir)?;
     println!(
         "{} Report saved: {}",
         style("✓").green(),
@@ -93,8 +114,8 @@ pub fn run() -> Result<()> {
     );
     
     // Summary with ceiling info
-    let has_aggressive = processable_analyses.iter().any(|a| a.target_tp == -0.5);
-    let has_conservative = processable_analyses.iter().any(|a| a.target_tp == -1.0);
+    let lossless_count = processable_analyses.iter().filter(|a| !a.is_mp3).count();
+    let mp3_count = processable_analyses.iter().filter(|a| a.is_mp3).count();
     
     println!(
         "\n{} {} files can be boosted",
@@ -102,24 +123,18 @@ pub fn run() -> Result<()> {
         processable.len()
     );
     
-    if has_aggressive && has_conservative {
+    if lossless_count > 0 {
         println!(
-            "  {} Lossless/high-bitrate: -0.5 dBTP ceiling",
-            style("•").dim()
+            "  {} {} lossless files → -0.5 dBTP ceiling (ffmpeg)",
+            style("•").dim(),
+            lossless_count
         );
+    }
+    if mp3_count > 0 {
         println!(
-            "  {} Low-bitrate: -1.0 dBTP ceiling",
-            style("•").dim()
-        );
-    } else if has_aggressive {
-        println!(
-            "  {} Target ceiling: -0.5 dBTP (lossless/high-bitrate)",
-            style("•").dim()
-        );
-    } else {
-        println!(
-            "  {} Target ceiling: -1.0 dBTP",
-            style("•").dim()
+            "  {} {} MP3 files → -1.0 dBTP ceiling (mp3gain, 1.5dB steps)",
+            style("•").dim(),
+            mp3_count
         );
     }
     
@@ -141,7 +156,7 @@ pub fn run() -> Result<()> {
     
     // Create backup directory if needed
     let backup_dir = if create_backup {
-        let dir = processor::create_backup_dir(&target_dir)?;
+        let dir = processor::create_backup_dir(target_dir)?;
         println!(
             "{} Backup directory: {}",
             style("✓").green(),
@@ -158,13 +173,20 @@ pub fn run() -> Result<()> {
         .map(|(idx, _)| files[*idx].clone())
         .collect();
     
-    process_files(&processable_files, &processable_analyses, &target_dir, backup_dir.as_deref())?;
+    process_files(&processable_files, &processable_analyses, target_dir, backup_dir.as_deref())?;
     
     println!(
         "\n{} Done! {} files processed.",
         style("✓").green().bold(),
         processable.len()
     );
+    
+    if mp3_count > 0 {
+        println!(
+            "  {} MP3 gain is lossless and reversible (undo info saved in tags)",
+            style("ℹ").dim()
+        );
+    }
     
     Ok(())
 }
@@ -173,7 +195,7 @@ fn print_banner() {
     let banner_style = Style::new().cyan().bold();
     println!();
     println!("{}", banner_style.apply_to("╭─────────────────────────────────────╮"));
-    println!("{}", banner_style.apply_to("│          headroom v0.2.0            │"));
+    println!("{}", banner_style.apply_to("│          headroom v0.3.0            │"));
     println!("{}", banner_style.apply_to("│   Audio Loudness Analyzer & Gain    │"));
     println!("{}", banner_style.apply_to("╰─────────────────────────────────────╯"));
     println!();
