@@ -291,6 +291,10 @@ At 320kbps, the re-encode introduces quantization noise below -90dB—far below 
 
 ## Changelog
 
+### v0.5.2
+- **Fix version display**: Banner now shows correct version
+- **Fix release workflow**: Remove caveats, add mp3gain as dependency
+
 ### v0.5.1
 - **Minimum gain threshold**: Skip files with <0.05 dB headroom (avoids processing files with negligible gain)
 
