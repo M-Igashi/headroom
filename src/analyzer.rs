@@ -5,13 +5,16 @@ use std::process::Command;
 
 use crate::scanner;
 
-/// True Peak ceiling for lossless files (FLAC, AIFF, WAV)
+/// True Peak ceiling for lossless files and high-bitrate (≥256kbps) lossy files
 /// Based on AES TD1008: high-rate codecs work satisfactorily with -0.5 dBTP
-const TARGET_TRUE_PEAK_LOSSLESS: f64 = -0.5;
+const TARGET_TRUE_PEAK_HIGH_QUALITY: f64 = -0.5;
 
-/// True Peak ceiling for MP3 files
-/// More conservative due to lossy format characteristics
-const TARGET_TRUE_PEAK_MP3: f64 = -1.0;
+/// True Peak ceiling for low-bitrate (<256kbps) lossy files
+/// Based on AES TD1008: lower bit rate codecs tend to overshoot peaks more
+const TARGET_TRUE_PEAK_LOW_BITRATE: f64 = -1.0;
+
+/// Bitrate threshold in kbps (AES TD1008 uses 256kbps as reference)
+const HIGH_BITRATE_THRESHOLD: u32 = 256;
 
 /// MP3 gain step size in dB (fixed by MP3 format specification)
 pub const MP3_GAIN_STEP: f64 = 1.5;
@@ -25,6 +28,7 @@ pub struct AudioAnalysis {
     pub headroom: f64,          // Available gain (dB)
     pub target_tp: f64,         // Target True Peak ceiling (dBTP)
     pub is_mp3: bool,           // Whether file is MP3
+    pub bitrate_kbps: Option<u32>, // Bitrate for lossy files
     pub effective_gain: f64,    // Actual gain to apply (for MP3: rounded to 1.5dB steps)
     pub mp3_gain_steps: i32,    // For MP3: number of gain steps to apply
 }
@@ -49,6 +53,48 @@ struct LoudnormOutput {
     normalization_type: String,
     #[allow(dead_code)]
     target_offset: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct FfprobeFormat {
+    bit_rate: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct FfprobeOutput {
+    format: FfprobeFormat,
+}
+
+fn get_bitrate(path: &Path) -> Option<u32> {
+    let output = Command::new("ffprobe")
+        .args([
+            "-v", "quiet",
+            "-print_format", "json",
+            "-show_format",
+            path.to_str()?,
+        ])
+        .output()
+        .ok()?;
+    
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let probe: FfprobeOutput = serde_json::from_str(&stdout).ok()?;
+    
+    probe.format.bit_rate
+        .and_then(|br| br.parse::<u32>().ok())
+        .map(|bps| bps / 1000) // Convert to kbps
+}
+
+fn get_target_true_peak(is_mp3: bool, bitrate_kbps: Option<u32>) -> f64 {
+    if !is_mp3 {
+        // Lossless files always use -0.5 dBTP
+        return TARGET_TRUE_PEAK_HIGH_QUALITY;
+    }
+    
+    // MP3: check bitrate
+    match bitrate_kbps {
+        Some(kbps) if kbps >= HIGH_BITRATE_THRESHOLD => TARGET_TRUE_PEAK_HIGH_QUALITY,
+        _ => TARGET_TRUE_PEAK_LOW_BITRATE,
+    }
 }
 
 pub fn analyze_file(path: &Path) -> Result<AudioAnalysis> {
@@ -86,12 +132,15 @@ pub fn analyze_file(path: &Path) -> Result<AudioAnalysis> {
     
     let is_mp3 = scanner::is_mp3(path);
     
-    // Determine target ceiling based on format
-    let target_tp = if is_mp3 {
-        TARGET_TRUE_PEAK_MP3
+    // Get bitrate for MP3 files
+    let bitrate_kbps = if is_mp3 {
+        get_bitrate(path)
     } else {
-        TARGET_TRUE_PEAK_LOSSLESS
+        None
     };
+    
+    // Determine target ceiling based on format and bitrate
+    let target_tp = get_target_true_peak(is_mp3, bitrate_kbps);
     
     let headroom = target_tp - input_tp;
     
@@ -118,6 +167,7 @@ pub fn analyze_file(path: &Path) -> Result<AudioAnalysis> {
         headroom,
         target_tp,
         is_mp3,
+        bitrate_kbps,
         effective_gain,
         mp3_gain_steps,
     })

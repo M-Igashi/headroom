@@ -115,7 +115,12 @@ fn run_scan(target_dir: &std::path::Path, include_mp3: bool) -> Result<()> {
     
     // Summary with ceiling info
     let lossless_count = processable_analyses.iter().filter(|a| !a.is_mp3).count();
-    let mp3_count = processable_analyses.iter().filter(|a| a.is_mp3).count();
+    let mp3_high_bitrate = processable_analyses.iter()
+        .filter(|a| a.is_mp3 && a.target_tp == -0.5)
+        .count();
+    let mp3_low_bitrate = processable_analyses.iter()
+        .filter(|a| a.is_mp3 && a.target_tp == -1.0)
+        .count();
     
     println!(
         "\n{} {} files can be boosted",
@@ -125,16 +130,23 @@ fn run_scan(target_dir: &std::path::Path, include_mp3: bool) -> Result<()> {
     
     if lossless_count > 0 {
         println!(
-            "  {} {} lossless files → -0.5 dBTP ceiling (ffmpeg)",
+            "  {} {} lossless files → -0.5 dBTP (ffmpeg)",
             style("•").dim(),
             lossless_count
         );
     }
-    if mp3_count > 0 {
+    if mp3_high_bitrate > 0 {
         println!(
-            "  {} {} MP3 files → -1.0 dBTP ceiling (mp3gain, 1.5dB steps)",
+            "  {} {} MP3 files (≥256kbps) → -0.5 dBTP (mp3gain, 1.5dB steps)",
             style("•").dim(),
-            mp3_count
+            mp3_high_bitrate
+        );
+    }
+    if mp3_low_bitrate > 0 {
+        println!(
+            "  {} {} MP3 files (<256kbps) → -1.0 dBTP (mp3gain, 1.5dB steps)",
+            style("•").dim(),
+            mp3_low_bitrate
         );
     }
     
@@ -174,6 +186,8 @@ fn run_scan(target_dir: &std::path::Path, include_mp3: bool) -> Result<()> {
         .collect();
     
     process_files(&processable_files, &processable_analyses, target_dir, backup_dir.as_deref())?;
+    
+    let mp3_count = mp3_high_bitrate + mp3_low_bitrate;
     
     println!(
         "\n{} Done! {} files processed.",
