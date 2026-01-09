@@ -2,7 +2,9 @@ use anyhow::{Context, Result};
 use console::{style, Style};
 use dialoguer::{Confirm, theme::ColorfulTheme};
 use indicatif::{ProgressBar, ProgressStyle};
+use rayon::prelude::*;
 use std::path::PathBuf;
+use std::sync::Mutex;
 
 use crate::analyzer::{self, AudioAnalysis, MP3_GAIN_STEP};
 use crate::processor;
@@ -209,7 +211,7 @@ fn print_banner() {
     let banner_style = Style::new().cyan().bold();
     println!();
     println!("{}", banner_style.apply_to("╭─────────────────────────────────────╮"));
-    println!("{}", banner_style.apply_to("│          headroom v0.3.1            │"));
+    println!("{}", banner_style.apply_to("│          headroom v0.4.0            │"));
     println!("{}", banner_style.apply_to("│   Audio Loudness Analyzer & Gain    │"));
     println!("{}", banner_style.apply_to("╰─────────────────────────────────────╯"));
     println!();
@@ -224,13 +226,19 @@ fn analyze_files(files: &[PathBuf]) -> Result<Vec<AudioAnalysis>> {
             .progress_chars("█▓░"),
     );
     
-    let mut analyses = Vec::new();
+    // Thread-safe collection for results with index to preserve order
+    let results: Mutex<Vec<(usize, Option<AudioAnalysis>)>> = Mutex::new(Vec::new());
+    let errors: Mutex<Vec<String>> = Mutex::new(Vec::new());
     
-    for file in files {
+    // Parallel analysis using rayon
+    files.par_iter().enumerate().for_each(|(idx, file)| {
         match analyzer::analyze_file(file) {
-            Ok(analysis) => analyses.push(analysis),
+            Ok(analysis) => {
+                results.lock().unwrap().push((idx, Some(analysis)));
+            }
             Err(e) => {
-                pb.println(format!(
+                results.lock().unwrap().push((idx, None));
+                errors.lock().unwrap().push(format!(
                     "{} Failed to analyze {}: {}",
                     style("⚠").yellow(),
                     file.display(),
@@ -239,9 +247,23 @@ fn analyze_files(files: &[PathBuf]) -> Result<Vec<AudioAnalysis>> {
             }
         }
         pb.inc(1);
-    }
+    });
     
     pb.finish_and_clear();
+    
+    // Print any errors
+    for err in errors.lock().unwrap().iter() {
+        println!("{}", err);
+    }
+    
+    // Sort by original index and extract successful analyses
+    let mut indexed_results = results.into_inner().unwrap();
+    indexed_results.sort_by_key(|(idx, _)| *idx);
+    let analyses: Vec<AudioAnalysis> = indexed_results
+        .into_iter()
+        .filter_map(|(_, analysis)| analysis)
+        .collect();
+    
     println!(
         "{} Analyzed {} files",
         style("✓").green(),
