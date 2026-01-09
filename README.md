@@ -2,6 +2,8 @@
 
 Audio loudness analyzer and gain adjustment tool for mastering and DJ workflows.
 
+⭐ **If this tool helps your DJ workflow, please consider giving it a star!** It helps others discover the project.
+
 ## What is this?
 
 **headroom** simulates the behavior of Rekordbox's Auto Gain feature, but with a key difference: it identifies files with available headroom (True Peak below the target ceiling) and applies gain adjustment **without using a limiter**.
@@ -149,11 +151,6 @@ $ headroom
 ```bash
 brew tap M-Igashi/tap
 brew install headroom
-```
-
-For MP3 support:
-```bash
-brew install mp3gain
 ```
 
 ### Windows
@@ -317,6 +314,12 @@ At 320kbps, the re-encode introduces quantization noise below -90dB—far below 
 ### v0.1.0
 - Initial release
 - Fixed -1.0 dBTP ceiling
+
+## Contributing
+
+Found a bug or have a feature request? Please [open an issue](https://github.com/M-Igashi/headroom/issues)!
+
+If headroom has been useful for your DJ sets, consider ⭐ starring the repo — it really helps!
 
 ## License
 
