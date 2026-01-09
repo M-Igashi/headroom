@@ -71,7 +71,7 @@ pub fn run() -> Result<()> {
             "\n{} No files with positive headroom found.",
             style("ℹ").blue()
         );
-        println!("  All files are already at or above -1 dBTP ceiling.");
+        println!("  All files are already at or above the target ceiling.");
         return Ok(());
     }
     
@@ -92,12 +92,36 @@ pub fn run() -> Result<()> {
         csv_path.display()
     );
     
-    // Summary
+    // Summary with ceiling info
+    let has_aggressive = processable_analyses.iter().any(|a| a.target_tp == -0.5);
+    let has_conservative = processable_analyses.iter().any(|a| a.target_tp == -1.0);
+    
     println!(
-        "\n{} {} files can be boosted to -1 dBTP",
+        "\n{} {} files can be boosted",
         style("ℹ").blue(),
         processable.len()
     );
+    
+    if has_aggressive && has_conservative {
+        println!(
+            "  {} Lossless/high-bitrate: -0.5 dBTP ceiling",
+            style("•").dim()
+        );
+        println!(
+            "  {} Low-bitrate: -1.0 dBTP ceiling",
+            style("•").dim()
+        );
+    } else if has_aggressive {
+        println!(
+            "  {} Target ceiling: -0.5 dBTP (lossless/high-bitrate)",
+            style("•").dim()
+        );
+    } else {
+        println!(
+            "  {} Target ceiling: -1.0 dBTP",
+            style("•").dim()
+        );
+    }
     
     // Confirm processing
     if !Confirm::with_theme(&ColorfulTheme::default())
@@ -149,7 +173,7 @@ fn print_banner() {
     let banner_style = Style::new().cyan().bold();
     println!();
     println!("{}", banner_style.apply_to("╭─────────────────────────────────────╮"));
-    println!("{}", banner_style.apply_to("│          headroom v0.1.0            │"));
+    println!("{}", banner_style.apply_to("│          headroom v0.2.0            │"));
     println!("{}", banner_style.apply_to("│   Audio Loudness Analyzer & Gain    │"));
     println!("{}", banner_style.apply_to("╰─────────────────────────────────────╯"));
     println!();
