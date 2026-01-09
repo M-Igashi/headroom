@@ -10,7 +10,7 @@ This tool is designed for DJs and producers who want to maximize loudness while 
 
 ## Key Features
 
-- **Smart True Peak ceiling**: Uses -0.5 dBTP for lossless files, -1.0 dBTP for MP3 (see below)
+- **Smart True Peak ceiling**: Based on AES TD1008, uses -0.5 dBTP for high-quality files, -1.0 dBTP for low-bitrate
 - **MP3 support**: Uses mp3gain for truly lossless, reversible gain adjustment (1.5dB steps)
 - **Non-destructive workflow**: Original files are backed up before processing
 - **Metadata preservation**: Files are overwritten in place, so Rekordbox tags, cue points, and other metadata remain intact
@@ -19,24 +19,37 @@ This tool is designed for DJs and producers who want to maximize loudness while 
 
 ## Supported Formats
 
-| Format | Extension | Method | Ceiling | Notes |
-|--------|-----------|--------|---------|-------|
-| FLAC | .flac | ffmpeg | -0.5 dBTP | Arbitrary precision |
-| AIFF | .aiff, .aif | ffmpeg | -0.5 dBTP | Arbitrary precision |
-| WAV | .wav | ffmpeg | -0.5 dBTP | Arbitrary precision |
-| MP3 | .mp3 | mp3gain | -1.0 dBTP | 1.5dB steps, truly lossless |
+| Format | Extension | Method | Notes |
+|--------|-----------|--------|-------|
+| FLAC | .flac | ffmpeg | Arbitrary precision |
+| AIFF | .aiff, .aif | ffmpeg | Arbitrary precision |
+| WAV | .wav | ffmpeg | Arbitrary precision |
+| MP3 | .mp3 | mp3gain | 1.5dB steps, truly lossless |
 
 ## True Peak Ceiling Strategy
 
-Based on [AES TD1008](https://www.aes.org/technical/documentDownloads.cfm?docID=731) recommendations:
+Based on [AES TD1008](https://www.aes.org/technical/documentDownloads.cfm?docID=731) recommendations, headroom uses different True Peak ceilings depending on the audio format and bitrate:
 
-| Format | Ceiling | Rationale |
-|--------|---------|-----------|
-| Lossless (FLAC, AIFF, WAV) | **-0.5 dBTP** | Will be distributed via high-bitrate streaming (Spotify 320kbps, Apple Music 256kbps) |
-| MP3 | **-1.0 dBTP** | Conservative ceiling for lossy format |
+| Format | Bitrate | Ceiling | Rationale |
+|--------|---------|---------|-----------|
+| Lossless (FLAC, AIFF, WAV) | — | **-0.5 dBTP** | Will be distributed via high-bitrate streaming |
+| MP3 | ≥256 kbps | **-0.5 dBTP** | High-bitrate codecs have minimal overshoot |
+| MP3 | <256 kbps | **-1.0 dBTP** | Lower bitrates cause more codec overshoot |
 
-From AES TD1008:
+### Why -0.5 dBTP for High-Bitrate Files?
+
+The traditional -1.0 dBTP recommendation accounts for:
+1. **True Peak meter error** (~0.6 dB with 4x oversampling)
+2. **Codec overshoot** during lossy encoding
+
+However, AES TD1008 clarifies that codec overshoot is **bitrate-dependent**:
+
 > "High rate (e.g., 256 kbps) coders may work satisfactorily with as little as −0.5 dB TP for the limiting threshold. However, lower bit rate coders tend to overshoot peaks even more, so the limiting threshold may need to be reduced below −1.0 dB TP."
+
+For DJ/mastering workflows:
+- Lossless files will be distributed via high-bitrate streaming (Spotify Premium 320kbps OGG, Apple Music 256kbps AAC)
+- 320kbps MP3s are already at high bitrate — no additional codec conversion will occur
+- Therefore, **-0.5 dBTP is safe** for these files, giving you **+0.5 dB extra headroom**
 
 ## MP3 Gain Adjustment
 
@@ -55,7 +68,7 @@ The 1.5dB step limitation means:
 
 1. Scans the current directory for audio files
 2. Measures LUFS (Integrated Loudness) and True Peak using ffmpeg
-3. Determines the appropriate ceiling based on format
+3. Determines the appropriate ceiling based on format and bitrate
 4. Calculates headroom: `Target Ceiling - Current True Peak`
 5. Reports only files that can be boosted
 6. Optionally applies gain adjustment with backup
@@ -80,14 +93,15 @@ $ headroom
 Filename                 LUFS    True Peak    Target     Headroom    Effective
 ────────────────────────────────────────────────────────────────────────────────
 track01.aif             -13.3     -3.2 dBTP  -0.5 dBTP      +2.7 dB      +2.7 dB
-track02.mp3             -14.1     -4.5 dBTP  -1.0 dBTP      +3.5 dB      +3.0 dB
-subfolder/track03.flac  -12.0     -4.0 dBTP  -0.5 dBTP      +3.5 dB      +3.5 dB
+track02.mp3 (320k)      -14.1     -3.5 dBTP  -0.5 dBTP      +3.0 dB      +3.0 dB
+track03.mp3 (128k)      -12.5     -4.0 dBTP  -1.0 dBTP      +3.0 dB      +3.0 dB
 
 ✓ Report saved: ./headroom_report_20250109_123456.csv
 
 ℹ 3 files can be boosted
-  • 2 lossless files → -0.5 dBTP ceiling (ffmpeg)
-  • 1 MP3 files → -1.0 dBTP ceiling (mp3gain, 1.5dB steps)
+  • 1 lossless files → -0.5 dBTP (ffmpeg)
+  • 1 MP3 files (≥256kbps) → -0.5 dBTP (mp3gain, 1.5dB steps)
+  • 1 MP3 files (<256kbps) → -1.0 dBTP (mp3gain, 1.5dB steps)
 ? Apply gain adjustment to these files? [y/N] y
 ? Create backup before processing? [Y/n] y
 ✓ Backup directory: ./backup
@@ -184,7 +198,7 @@ The tool will guide you through:
 | Filename | Format | LUFS | True Peak (dBTP) | Target (dBTP) | Headroom (dB) | Effective Gain (dB) |
 |----------|--------|------|------------------|---------------|---------------|---------------------|
 | track01.aif | Lossless | -13.3 | -3.2 | -0.5 | +2.7 | +2.7 |
-| track02.mp3 | MP3 | -14.1 | -4.5 | -1.0 | +3.5 | +3.0 |
+| track02.mp3 | MP3 | -14.1 | -3.5 | -0.5 | +3.0 | +3.0 |
 
 ### Backup Structure
 
@@ -233,6 +247,7 @@ ReplayGain tags are not supported by Rekordbox/CDJ, so mp3gain is the best optio
 
 ### v0.3.0
 - **MP3 support**: Uses mp3gain for truly lossless gain adjustment (1.5dB steps)
+- **Bitrate-aware ceiling**: MP3 ≥256kbps uses -0.5 dBTP, <256kbps uses -1.0 dBTP
 - Added "Effective Gain" column showing actual gain to be applied
 - Interactive prompt to include/exclude MP3 files
 
