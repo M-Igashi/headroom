@@ -33,3 +33,4 @@ dist/
 # Added by cargo
 
 /target
+release/
