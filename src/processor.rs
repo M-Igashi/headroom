@@ -3,7 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use crate::analyzer::AudioAnalysis;
+use crate::analyzer::{AudioAnalysis, GainMethod};
 
 pub struct ProcessResult {
     pub success: bool,
@@ -37,7 +37,7 @@ pub fn backup_file(file_path: &Path, base_dir: &Path, backup_dir: &Path) -> Resu
     Ok(backup_path)
 }
 
-/// Apply gain to lossless files using ffmpeg
+/// Apply gain to lossless files using ffmpeg volume filter
 pub fn apply_gain_ffmpeg(file_path: &Path, gain_db: f64) -> Result<()> {
     // Create temp file with same extension
     let extension = file_path
@@ -116,11 +116,56 @@ pub fn apply_gain_mp3gain(file_path: &Path, gain_steps: i32) -> Result<()> {
     Ok(())
 }
 
+/// Apply gain to MP3 files by re-encoding (lossy, but precise control)
+pub fn apply_gain_mp3_reencode(file_path: &Path, gain_db: f64, bitrate_kbps: Option<u32>) -> Result<()> {
+    let temp_path = file_path.with_extension("tmp.mp3");
+    
+    // Determine target bitrate (preserve original or use 320k for high quality)
+    let bitrate = match bitrate_kbps {
+        Some(kbps) if kbps >= 256 => format!("{}k", kbps),
+        Some(kbps) => format!("{}k", kbps),
+        None => "320k".to_string(),
+    };
+    
+    let args = vec![
+        "-y".to_string(),
+        "-i".to_string(),
+        file_path.to_str().ok_or_else(|| anyhow!("Invalid path"))?.to_string(),
+        "-af".to_string(),
+        format!("volume={}dB", gain_db),
+        "-c:a".to_string(),
+        "libmp3lame".to_string(),
+        "-b:a".to_string(),
+        bitrate,
+        "-q:a".to_string(),
+        "0".to_string(),  // Highest quality VBR
+        temp_path.to_str().ok_or_else(|| anyhow!("Invalid temp path"))?.to_string(),
+    ];
+    
+    let output = Command::new("ffmpeg")
+        .args(&args)
+        .output()
+        .context("Failed to execute ffmpeg for MP3 re-encode")?;
+    
+    if !output.status.success() {
+        let _ = fs::remove_file(&temp_path);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow!("ffmpeg MP3 re-encode failed: {}", stderr));
+    }
+    
+    // Replace original with processed file
+    fs::remove_file(file_path).context("Failed to remove original file")?;
+    fs::rename(&temp_path, file_path).context("Failed to rename processed file")?;
+    
+    Ok(())
+}
+
 pub fn process_file(
     file_path: &Path,
     analysis: &AudioAnalysis,
     base_dir: &Path,
     backup_dir: Option<&Path>,
+    allow_reencode: bool,
 ) -> ProcessResult {
     let mut result = ProcessResult {
         success: false,
@@ -128,7 +173,13 @@ pub fn process_file(
     };
     
     // Skip if no effective gain to apply
-    if analysis.effective_gain <= 0.0 {
+    if !analysis.has_headroom() {
+        result.success = true;
+        return result;
+    }
+    
+    // Skip re-encode files if not allowed
+    if analysis.requires_reencode() && !allow_reencode {
         result.success = true;
         return result;
     }
@@ -141,11 +192,18 @@ pub fn process_file(
         }
     }
     
-    // Apply gain based on file type
-    let apply_result = if analysis.is_mp3 {
-        apply_gain_mp3gain(file_path, analysis.mp3_gain_steps)
-    } else {
-        apply_gain_ffmpeg(file_path, analysis.effective_gain)
+    // Apply gain based on method
+    let apply_result = match analysis.gain_method {
+        GainMethod::FfmpegLossless => {
+            apply_gain_ffmpeg(file_path, analysis.effective_gain)
+        }
+        GainMethod::Mp3Lossless => {
+            apply_gain_mp3gain(file_path, analysis.mp3_gain_steps)
+        }
+        GainMethod::Mp3Reencode => {
+            apply_gain_mp3_reencode(file_path, analysis.effective_gain, analysis.bitrate_kbps)
+        }
+        GainMethod::None => Ok(()),
     };
     
     match apply_result {

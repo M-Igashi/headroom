@@ -4,7 +4,7 @@ use walkdir::WalkDir;
 const LOSSLESS_EXTENSIONS: &[&str] = &["flac", "aiff", "aif", "wav"];
 const MP3_EXTENSIONS: &[&str] = &["mp3"];
 
-pub fn scan_audio_files(dir: &Path, include_mp3: bool) -> Vec<PathBuf> {
+pub fn scan_audio_files(dir: &Path) -> Vec<PathBuf> {
     WalkDir::new(dir)
         .into_iter()
         .filter_map(|e| e.ok())
@@ -22,13 +22,8 @@ pub fn scan_audio_files(dir: &Path, include_mp3: bool) -> Vec<PathBuf> {
                 .and_then(|ext| ext.to_str())
                 .map(|ext| {
                     let ext_lower = ext.to_lowercase();
-                    if LOSSLESS_EXTENSIONS.contains(&ext_lower.as_str()) {
-                        return true;
-                    }
-                    if include_mp3 && MP3_EXTENSIONS.contains(&ext_lower.as_str()) {
-                        return true;
-                    }
-                    false
+                    LOSSLESS_EXTENSIONS.contains(&ext_lower.as_str()) 
+                        || MP3_EXTENSIONS.contains(&ext_lower.as_str())
                 })
                 .unwrap_or(false)
         })
@@ -36,11 +31,9 @@ pub fn scan_audio_files(dir: &Path, include_mp3: bool) -> Vec<PathBuf> {
         .collect()
 }
 
-pub fn get_supported_extensions(include_mp3: bool) -> Vec<&'static str> {
+pub fn get_supported_extensions() -> Vec<&'static str> {
     let mut exts: Vec<&str> = LOSSLESS_EXTENSIONS.to_vec();
-    if include_mp3 {
-        exts.extend(MP3_EXTENSIONS);
-    }
+    exts.extend(MP3_EXTENSIONS);
     exts
 }
 
