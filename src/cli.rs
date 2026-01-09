@@ -209,7 +209,7 @@ fn print_banner() {
     let banner_style = Style::new().cyan().bold();
     println!();
     println!("{}", banner_style.apply_to("╭─────────────────────────────────────╮"));
-    println!("{}", banner_style.apply_to("│          headroom v0.3.0            │"));
+    println!("{}", banner_style.apply_to("│          headroom v0.3.1            │"));
     println!("{}", banner_style.apply_to("│   Audio Loudness Analyzer & Gain    │"));
     println!("{}", banner_style.apply_to("╰─────────────────────────────────────╯"));
     println!();
