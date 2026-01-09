@@ -23,6 +23,10 @@ const HIGH_BITRATE_THRESHOLD: u32 = 256;
 /// MP3 gain step size in dB (fixed by MP3 format specification)
 pub const MP3_GAIN_STEP: f64 = 1.5;
 
+/// Minimum effective gain threshold (dB)
+/// Files with less headroom than this are skipped
+const MIN_EFFECTIVE_GAIN: f64 = 0.05;
+
 /// Processing method for the file
 #[derive(Debug, Clone, PartialEq)]
 pub enum GainMethod {
@@ -183,7 +187,7 @@ pub fn analyze_file(path: &Path) -> Result<AudioAnalysis> {
     // Determine gain method and effective gain
     let (gain_method, effective_gain, mp3_gain_steps) = if !is_mp3 {
         // Lossless file: use ffmpeg if headroom > 0
-        if headroom > 0.0 {
+        if headroom >= MIN_EFFECTIVE_GAIN {
             (GainMethod::FfmpegLossless, headroom, 0)
         } else {
             (GainMethod::None, 0.0, 0)
@@ -197,7 +201,7 @@ pub fn analyze_file(path: &Path) -> Result<AudioAnalysis> {
             // Can use mp3gain (at least 1.5dB gain possible with -2.0 dBTP ceiling)
             let effective = lossless_steps as f64 * MP3_GAIN_STEP;
             (GainMethod::Mp3Lossless, effective, lossless_steps)
-        } else if headroom > 0.0 {
+        } else if headroom >= MIN_EFFECTIVE_GAIN {
             // Has headroom but not enough for mp3gain, needs re-encode
             (GainMethod::Mp3Reencode, headroom, 0)
         } else {
