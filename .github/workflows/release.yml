@@ -52,7 +52,25 @@ jobs:
           SHA256=$(shasum -a 256 release/headroom-${{ steps.version.outputs.VERSION }}-macos-universal.tar.gz | awk '{print $1}')
           echo "SHA256=$SHA256" >> $GITHUB_OUTPUT
 
-      - name: Create Release
+      - name: Check for release notes
+        id: release_notes
+        run: |
+          if [ -f "RELEASE_NOTES.md" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release (with custom notes)
+        if: steps.release_notes.outputs.exists == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/headroom-${{ steps.version.outputs.VERSION }}-macos-universal.tar.gz
+          body_path: RELEASE_NOTES.md
+          append_body: true
+
+      - name: Create Release (auto-generated notes)
+        if: steps.release_notes.outputs.exists == 'false'
         uses: softprops/action-gh-release@v2
         with:
           files: release/headroom-${{ steps.version.outputs.VERSION }}-macos-universal.tar.gz
@@ -91,7 +109,6 @@ jobs:
             license "MIT"
 
             depends_on "ffmpeg"
-            depends_on "mp3gain"
 
             def install
               bin.install "headroom"
