@@ -265,12 +265,13 @@ The MP3 format stores a "global_gain" value as an 8-bit integer (0-255). When de
 
 This is a fundamental limitation of the MP3 format, not a tool limitation. headroom's native Rust implementation directly manipulates this field in each MP3 frame's side information.
 
-### Why -2.0 dBTP for Native MP3 Gain?
+### Why Bitrate-Aware Ceiling for Native MP3?
 
-With 1.5dB step limitation, we use a more conservative -2.0 dBTP ceiling:
-- Ensures the stepped gain doesn't overshoot the safe zone
-- Example: File at -3.2 dBTP gets 1 step (+1.5dB) → -1.7 dBTP (safe)
-- If we used -0.5 dBTP ceiling, same file would need +2.7dB, but get +1.5dB (waste of potential)
+With 1.5dB step limitation, the ceiling is calculated based on bitrate to match re-encode targets:
+- **≥256kbps**: Target -0.5 dBTP, so native lossless requires TP ≤ -2.0 dBTP (allowing at least 1 step)
+- **<256kbps**: Target -1.0 dBTP, so native lossless requires TP ≤ -2.5 dBTP (more conservative)
+- Example: 320kbps file at -3.5 dBTP gets 2 steps (+3.0dB) → -0.5 dBTP (optimal)
+- Example: 128kbps file at -3.5 dBTP gets 1 step (+1.5dB) → -2.0 dBTP (within -1.0 ceiling)
 
 ### MP3 Re-encode Quality
 
@@ -287,10 +288,17 @@ At 320kbps, the re-encode introduces quantization noise below -90dB—far below 
 | Method | Precision | Quality Loss | External Deps | Use Case |
 |--------|-----------|--------------|---------------|----------|
 | ffmpeg (lossless) | Arbitrary | None | ffmpeg | FLAC, AIFF, WAV |
-| native (MP3) | 1.5dB steps | **None** | None | MP3 with ≥3.5dB headroom |
+| native (MP3) | 1.5dB steps | **None** | None | MP3 with ≥1.5dB to bitrate ceiling |
 | ffmpeg re-encode | Arbitrary | Inaudible at ≥256kbps | ffmpeg | MP3 needing precise gain |
 
 ## Changelog
+
+### v1.0.1
+- **Bitrate-aware native lossless ceiling**: Native MP3 processing now uses the same bitrate-aware ceiling as re-encode
+  - ≥256kbps: -0.5 dBTP ceiling (requires TP ≤ -2.0 dBTP)
+  - <256kbps: -1.0 dBTP ceiling (requires TP ≤ -2.5 dBTP)
+- Previously used fixed -2.0 dBTP ceiling regardless of bitrate
+- Low bitrate files are now more conservatively processed (correct behavior)
 
 ### v1.0.0
 - **Pure Rust MP3 implementation**: Removed mp3gain external dependency
