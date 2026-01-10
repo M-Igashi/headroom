@@ -34,7 +34,7 @@ pub fn generate_csv(analyses: &[AudioAnalysis], output_dir: &Path) -> Result<std
             .unwrap_or_else(|| "-".to_string());
         let method = match analysis.gain_method {
             GainMethod::FfmpegLossless => "ffmpeg",
-            GainMethod::Mp3Lossless => "mp3gain",
+            GainMethod::Mp3Lossless => "native",
             GainMethod::Mp3Reencode => "re-encode",
             GainMethod::None => "none",
         };
@@ -101,7 +101,7 @@ pub fn print_analysis_report(analyses: &[AudioAnalysis]) {
     // Print MP3 lossless gain section
     if !mp3_lossless_files.is_empty() {
         println!(
-            "{} {} MP3 files (mp3gain, lossless, 1.5dB steps, target: -2.0 dBTP)",
+            "{} {} MP3 files (native lossless, 1.5dB steps, target: -2.0 dBTP)",
             mp3_lossless_style.apply_to("●"),
             header_style.apply_to(format!("{}", mp3_lossless_files.len()))
         );

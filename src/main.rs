@@ -1,5 +1,6 @@
 mod analyzer;
 mod cli;
+mod mp3;
 mod processor;
 mod report;
 mod scanner;
