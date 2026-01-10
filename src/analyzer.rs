@@ -13,9 +13,6 @@ const TARGET_TRUE_PEAK_HIGH_QUALITY: f64 = -0.5;
 /// Based on AES TD1008: lower bit rate codecs tend to overshoot peaks more
 const TARGET_TRUE_PEAK_LOW_BITRATE: f64 = -1.0;
 
-/// True Peak ceiling for MP3 lossless gain (native implementation)
-/// More conservative to ensure 1.5dB steps don't cause clipping
-const TARGET_TRUE_PEAK_MP3_LOSSLESS: f64 = -2.0;
 
 /// Bitrate threshold in kbps (AES TD1008 uses 256kbps as reference)
 const HIGH_BITRATE_THRESHOLD: u32 = 256;
@@ -195,11 +192,17 @@ pub fn analyze_file(path: &Path) -> Result<AudioAnalysis> {
         }
     } else {
         // MP3 file: check if lossless gain is possible
-        let lossless_headroom = TARGET_TRUE_PEAK_MP3_LOSSLESS - input_tp;
+        // Use bitrate-aware ceiling: high bitrate targets -0.5 dBTP, low bitrate targets -1.0 dBTP
+        let lossless_ceiling = if bitrate_kbps.unwrap_or(0) >= HIGH_BITRATE_THRESHOLD {
+            TARGET_TRUE_PEAK_HIGH_QUALITY  // -0.5 dBTP
+        } else {
+            TARGET_TRUE_PEAK_LOW_BITRATE   // -1.0 dBTP
+        };
+        let lossless_headroom = lossless_ceiling - input_tp;
         let lossless_steps = (lossless_headroom / MP3_GAIN_STEP).floor() as i32;
         
         if lossless_steps >= 1 {
-            // Can use lossless MP3 gain (at least 1.5dB gain possible with -2.0 dBTP ceiling)
+            // Can use lossless MP3 gain (at least 1.5dB gain possible within bitrate-aware ceiling)
             let effective = lossless_steps as f64 * MP3_GAIN_STEP;
             (GainMethod::Mp3Lossless, effective, lossless_steps)
         } else if headroom >= MIN_EFFECTIVE_GAIN {

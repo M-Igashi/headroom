@@ -34,15 +34,16 @@ This tool is designed for DJs and producers who want to maximize loudness while 
 
 headroom intelligently chooses the best method for each MP3 file:
 
-### 1. Native Lossless (Pure Rust, -2.0 dBTP ceiling)
-For MP3 files with **≥3.5 dB headroom** to -2.0 dBTP:
+### 1. Native Lossless (Pure Rust, bitrate-aware ceiling)
+For MP3 files with ≥1.5 dB headroom to bitrate-aware ceiling:
 - Truly lossless global_gain header modification
 - 1.5 dB step increments (MP3 format specification)
 - No external tools required
-- More conservative ceiling (-2.0 dBTP) accounts for step limitation
+- ≥256kbps: -0.5 dBTP ceiling (requires TP ≤ -2.0 dBTP)
+- <256kbps: -1.0 dBTP ceiling (requires TP ≤ -2.5 dBTP)
 
-### 2. Re-encode (Precise, original ceiling)
-For MP3 files with headroom but **<3.5 dB to -2.0 dBTP**:
+### 2. Re-encode (Precise, bitrate-aware ceiling)
+For MP3 files with headroom but <1.5 dB to ceiling:
 - Uses ffmpeg for arbitrary precision gain
 - Preserves original bitrate
 - Requires explicit user confirmation
@@ -77,7 +78,8 @@ Based on [AES TD1008](https://www.aes.org/technical/documentDownloads.cfm?docID=
 | Format | Method | Ceiling | Rationale |
 |--------|--------|---------|-----------|
 | Lossless (FLAC, AIFF, WAV) | ffmpeg | **-0.5 dBTP** | Will be distributed via high-bitrate streaming |
-| MP3 (native lossless) | native | **-2.0 dBTP** | Conservative ceiling for 1.5dB step limitation |
+| MP3 ≥256kbps (native) | native | **-0.5 dBTP** | Requires TP ≤ -2.0 dBTP for 1.5dB steps |
+| MP3 <256kbps (native) | native | **-1.0 dBTP** | Requires TP ≤ -2.5 dBTP for 1.5dB steps |
 | MP3 ≥256kbps (re-encode) | ffmpeg | **-0.5 dBTP** | High-bitrate codecs have minimal overshoot |
 | MP3 <256kbps (re-encode) | ffmpeg | **-1.0 dBTP** | Lower bitrates cause more codec overshoot |
 
