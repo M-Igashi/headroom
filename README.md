@@ -291,53 +291,6 @@ At 320kbps, the re-encode introduces quantization noise below -90dB—far below 
 | native (MP3) | 1.5dB steps | **None** | None | MP3 with ≥1.5dB to bitrate ceiling |
 | ffmpeg re-encode | Arbitrary | Inaudible at ≥256kbps | ffmpeg | MP3 needing precise gain |
 
-## Changelog
-
-### v1.0.1
-- **Bitrate-aware native lossless ceiling**: Native MP3 processing now uses the same bitrate-aware ceiling as re-encode
-  - ≥256kbps: -0.5 dBTP ceiling (requires TP ≤ -2.0 dBTP)
-  - <256kbps: -1.0 dBTP ceiling (requires TP ≤ -2.5 dBTP)
-- Previously used fixed -2.0 dBTP ceiling regardless of bitrate
-- Low bitrate files are now more conservatively processed (correct behavior)
-
-### v1.0.0
-- **Pure Rust MP3 implementation**: Removed mp3gain external dependency
-- Native global_gain manipulation for lossless MP3 processing
-- Supports MPEG1/2/2.5 Layer III, stereo and mono
-- Handles ID3v2 tags automatically
-- Comprehensive test suite
-
-### v0.5.2
-- **Fix version display**: Banner now shows correct version
-- **Fix release workflow**: Remove caveats, add mp3gain as dependency
-
-### v0.5.1
-- **Minimum gain threshold**: Skip files with <0.05 dB headroom (avoids processing files with negligible gain)
-
-### v0.5.0
-- **Removed MP3 prompt**: All formats scanned by default
-- **Three-tier MP3 processing**: mp3gain (lossless) vs re-encode (precise)
-- **Categorized report**: Files grouped by processing method with color coding
-- **Two-stage confirmation**: Lossless processing first, then optional re-encode
-- **Conservative mp3gain ceiling**: -2.0 dBTP for better step utilization
-
-### v0.4.0
-- **Smart True Peak ceiling**: Bitrate-aware ceiling for MP3 files
-
-### v0.3.0
-- **MP3 support**: Uses mp3gain for truly lossless gain adjustment (1.5dB steps)
-- **Bitrate-aware ceiling**: MP3 ≥256kbps uses -0.5 dBTP, <256kbps uses -1.0 dBTP
-- Added "Effective Gain" column showing actual gain to be applied
-- Interactive prompt to include/exclude MP3 files
-
-### v0.2.0
-- **Smart True Peak ceiling**: Uses -0.5 dBTP for lossless files based on AES TD1008
-- Added Target column to report table
-
-### v0.1.0
-- Initial release
-- Fixed -1.0 dBTP ceiling
-
 ## Contributing
 
 Found a bug or have a feature request? Please [open an issue](https://github.com/M-Igashi/headroom/issues)!
