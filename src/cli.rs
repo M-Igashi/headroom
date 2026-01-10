@@ -83,41 +83,9 @@ pub fn run() -> Result<()> {
     let has_lossless = summary.total_lossless() > 0;
     let has_reencode = summary.reencode_count > 0;
     
-    // Check mp3gain availability if needed
-    let mp3gain_available = if summary.mp3_lossless_count > 0 {
-        analyzer::check_mp3gain().is_ok()
-    } else {
-        true
-    };
-    
-    if !mp3gain_available && summary.mp3_lossless_count > 0 {
-        println!(
-            "\n{} mp3gain not found. MP3 lossless gain will be skipped.",
-            style("⚠").yellow()
-        );
-        println!(
-            "  Install with: {}",
-            style("brew install mp3gain").cyan()
-        );
-    }
-    
     // First dialog: Lossless processing
-    if has_lossless && mp3gain_available {
+    if has_lossless {
         if !prompt_lossless_processing(&summary)? {
-            println!("Done. No files were modified.");
-            return Ok(());
-        }
-    } else if has_lossless && !mp3gain_available {
-        // Only lossless files (no mp3gain)
-        let prompt = format!(
-            "Apply gain to {} lossless files?",
-            summary.lossless_count
-        );
-        if !Confirm::with_theme(&ColorfulTheme::default())
-            .with_prompt(&prompt)
-            .default(false)
-            .interact()?
-        {
             println!("Done. No files were modified.");
             return Ok(());
         }
@@ -154,7 +122,7 @@ pub fn run() -> Result<()> {
         .filter(|a| {
             match a.gain_method {
                 GainMethod::FfmpegLossless => true,
-                GainMethod::Mp3Lossless => mp3gain_available,
+                GainMethod::Mp3Lossless => true,
                 GainMethod::Mp3Reencode => allow_reencode,
                 GainMethod::None => false,
             }
@@ -195,7 +163,7 @@ pub fn run() -> Result<()> {
     }
     if processed_mp3_lossless > 0 {
         println!(
-            "  {} {} MP3 files (mp3gain, lossless)",
+            "  {} {} MP3 files (native, lossless)",
             style("•").dim(),
             processed_mp3_lossless
         );
@@ -259,7 +227,7 @@ fn print_banner() {
     let banner_style = Style::new().cyan().bold();
     println!();
     println!("{}", banner_style.apply_to("╭─────────────────────────────────────╮"));
-    println!("{}", banner_style.apply_to("│          headroom v0.5.2            │"));
+    println!("{}", banner_style.apply_to("│          headroom v1.0.0            │"));
     println!("{}", banner_style.apply_to("│   Audio Loudness Analyzer & Gain    │"));
     println!("{}", banner_style.apply_to("╰─────────────────────────────────────╯"));
     println!();

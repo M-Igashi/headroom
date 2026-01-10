@@ -13,8 +13,8 @@ const TARGET_TRUE_PEAK_HIGH_QUALITY: f64 = -0.5;
 /// Based on AES TD1008: lower bit rate codecs tend to overshoot peaks more
 const TARGET_TRUE_PEAK_LOW_BITRATE: f64 = -1.0;
 
-/// True Peak ceiling for MP3 lossless gain (mp3gain)
-/// More conservative to ensure mp3gain's 1.5dB steps don't cause clipping
+/// True Peak ceiling for MP3 lossless gain (native implementation)
+/// More conservative to ensure 1.5dB steps don't cause clipping
 const TARGET_TRUE_PEAK_MP3_LOSSLESS: f64 = -2.0;
 
 /// Bitrate threshold in kbps (AES TD1008 uses 256kbps as reference)
@@ -32,7 +32,7 @@ const MIN_EFFECTIVE_GAIN: f64 = 0.05;
 pub enum GainMethod {
     /// Lossless files processed with ffmpeg volume filter
     FfmpegLossless,
-    /// MP3 files with enough headroom for mp3gain (lossless, 1.5dB steps)
+    /// MP3 files with enough headroom for lossless gain (1.5dB steps)
     Mp3Lossless,
     /// MP3 files requiring re-encode for precise gain
     Mp3Reencode,
@@ -59,6 +59,7 @@ pub struct AudioAnalysis {
 
 impl AudioAnalysis {
     /// Returns true if this file can be processed with lossless methods
+    #[allow(dead_code)]
     pub fn can_lossless_process(&self) -> bool {
         matches!(self.gain_method, GainMethod::FfmpegLossless | GainMethod::Mp3Lossless)
     }
@@ -198,11 +199,11 @@ pub fn analyze_file(path: &Path) -> Result<AudioAnalysis> {
         let lossless_steps = (lossless_headroom / MP3_GAIN_STEP).floor() as i32;
         
         if lossless_steps >= 1 {
-            // Can use mp3gain (at least 1.5dB gain possible with -2.0 dBTP ceiling)
+            // Can use lossless MP3 gain (at least 1.5dB gain possible with -2.0 dBTP ceiling)
             let effective = lossless_steps as f64 * MP3_GAIN_STEP;
             (GainMethod::Mp3Lossless, effective, lossless_steps)
         } else if headroom >= MIN_EFFECTIVE_GAIN {
-            // Has headroom but not enough for mp3gain, needs re-encode
+            // Has headroom but not enough for lossless, needs re-encode
             (GainMethod::Mp3Reencode, headroom, 0)
         } else {
             (GainMethod::None, 0.0, 0)
@@ -235,13 +236,5 @@ pub fn check_ffmpeg() -> Result<()> {
         .arg("-version")
         .output()
         .context("ffmpeg not found. Please install ffmpeg first.")?;
-    Ok(())
-}
-
-pub fn check_mp3gain() -> Result<()> {
-    Command::new("mp3gain")
-        .arg("-v")
-        .output()
-        .context("mp3gain not found. Please install mp3gain first (brew install mp3gain).")?;
     Ok(())
 }

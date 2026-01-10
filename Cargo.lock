@@ -222,7 +222,7 @@ dependencies = [
 
 [[package]]
 name = "headroom"
-version = "0.5.2"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "chrono",

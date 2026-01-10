@@ -44,6 +44,7 @@ pub fn is_mp3(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
+#[allow(dead_code)]
 pub fn is_lossless(path: &Path) -> bool {
     path.extension()
         .and_then(|ext| ext.to_str())
