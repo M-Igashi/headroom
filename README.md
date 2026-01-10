@@ -12,8 +12,9 @@ This tool is designed for DJs and producers who want to maximize loudness while 
 
 ## Key Features
 
+- **Pure Rust implementation**: No external dependencies except ffmpeg — MP3 lossless gain is handled natively
 - **Smart True Peak ceiling**: Based on AES TD1008, uses -0.5 dBTP for high-quality files, -1.0 dBTP for low-bitrate
-- **Three processing methods**: ffmpeg for lossless, mp3gain for lossless MP3, re-encode for precise MP3 gain
+- **Three processing methods**: ffmpeg for lossless, native implementation for lossless MP3, re-encode for precise MP3 gain
 - **Non-destructive workflow**: Original files are backed up before processing
 - **Metadata preservation**: Files are overwritten in place, so Rekordbox tags, cue points, and other metadata remain intact
 - **No limiter**: Pure gain adjustment only — dynamics are preserved
@@ -26,18 +27,18 @@ This tool is designed for DJs and producers who want to maximize loudness while 
 | FLAC | .flac | ffmpeg | Arbitrary | Lossless re-encode |
 | AIFF | .aiff, .aif | ffmpeg | Arbitrary | Lossless re-encode |
 | WAV | .wav | ffmpeg | Arbitrary | Lossless re-encode |
-| MP3 | .mp3 | mp3gain | 1.5dB steps | Truly lossless (header modification) |
+| MP3 | .mp3 | native | 1.5dB steps | Truly lossless (global_gain modification) |
 | MP3 | .mp3 | ffmpeg re-encode | Arbitrary | For files needing precise gain |
 
 ## MP3 Processing: Three-Tier Approach
 
 headroom intelligently chooses the best method for each MP3 file:
 
-### 1. mp3gain (Lossless, -2.0 dBTP ceiling)
+### 1. Native Lossless (Pure Rust, -2.0 dBTP ceiling)
 For MP3 files with **≥3.5 dB headroom** to -2.0 dBTP:
-- Truly lossless header modification
-- 1.5 dB step increments
-- Fully reversible with `mp3gain -u`
+- Truly lossless global_gain header modification
+- 1.5 dB step increments (MP3 format specification)
+- No external tools required
 - More conservative ceiling (-2.0 dBTP) accounts for step limitation
 
 ### 2. Re-encode (Precise, original ceiling)
@@ -66,7 +67,7 @@ A common concern is quality loss when re-encoding MP3. However, for **gain adjus
 
 **Why we still offer the choice:**
 - Some users prefer the "zero re-encode" principle
-- mp3gain is truly bit-perfect for the audio data
+- Native lossless is truly bit-perfect for the audio data
 - Re-encode is opt-in with clear explanation
 
 ## True Peak Ceiling Strategy
@@ -76,7 +77,7 @@ Based on [AES TD1008](https://www.aes.org/technical/documentDownloads.cfm?docID=
 | Format | Method | Ceiling | Rationale |
 |--------|--------|---------|-----------|
 | Lossless (FLAC, AIFF, WAV) | ffmpeg | **-0.5 dBTP** | Will be distributed via high-bitrate streaming |
-| MP3 (mp3gain) | mp3gain | **-2.0 dBTP** | Conservative ceiling for 1.5dB step limitation |
+| MP3 (native lossless) | native | **-2.0 dBTP** | Conservative ceiling for 1.5dB step limitation |
 | MP3 ≥256kbps (re-encode) | ffmpeg | **-0.5 dBTP** | High-bitrate codecs have minimal overshoot |
 | MP3 <256kbps (re-encode) | ffmpeg | **-1.0 dBTP** | Lower bitrates cause more codec overshoot |
 
@@ -86,11 +87,11 @@ Based on [AES TD1008](https://www.aes.org/technical/documentDownloads.cfm?docID=
 2. Measures LUFS (Integrated Loudness) and True Peak using ffmpeg
 3. Categorizes files by processing method:
    - **Green**: Lossless files (ffmpeg)
-   - **Yellow**: MP3 files with enough headroom for mp3gain
+   - **Yellow**: MP3 files with enough headroom for native lossless gain
    - **Magenta**: MP3 files requiring re-encode
 4. Displays categorized report
 5. Two-stage confirmation:
-   - First: "Apply lossless gain adjustment?" (lossless + mp3gain)
+   - First: "Apply lossless gain adjustment?" (lossless + native MP3)
    - Second: "Also process MP3 files with re-encoding?" (optional)
 6. Creates backups and processes files
 
@@ -101,7 +102,7 @@ $ cd ~/Music/DJ-Tracks
 $ headroom
 
 ╭─────────────────────────────────────╮
-│          headroom v0.5.0            │
+│          headroom v1.0.0            │
 │   Audio Loudness Analyzer & Gain    │
 ╰─────────────────────────────────────╯
 
@@ -116,7 +117,7 @@ $ headroom
   track02.aif    -14.1    -4.5 dBTP   -0.5 dBTP   +4.0 dB
   track03.wav    -12.5    -2.8 dBTP   -0.5 dBTP   +2.3 dB
 
-● 2 MP3 files (mp3gain, lossless, 1.5dB steps, target: -2.0 dBTP)
+● 2 MP3 files (native lossless, 1.5dB steps, target: -2.0 dBTP)
   Filename        LUFS    True Peak    Target        Gain
   track04.mp3    -14.0    -5.5 dBTP   -2.0 dBTP   +3.0 dB
   track05.mp3    -13.5    -6.0 dBTP   -2.0 dBTP   +3.0 dB
@@ -140,7 +141,7 @@ $ headroom
 
 ✓ Done! 7 files processed.
   • 3 lossless files (ffmpeg)
-  • 2 MP3 files (mp3gain, lossless)
+  • 2 MP3 files (native, lossless)
   • 2 MP3 files (re-encoded)
 ```
 
@@ -153,6 +154,8 @@ brew tap M-Igashi/tap
 brew install headroom
 ```
 
+That's it! ffmpeg is installed automatically as a dependency.
+
 ### Windows
 
 #### Prerequisites
@@ -164,11 +167,7 @@ brew install headroom
    winget install ffmpeg
    ```
 
-2. **Install mp3gain** (optional, for lossless MP3 gain)
-
-   Download from [mp3gain.sourceforge.net](http://mp3gain.sourceforge.net/)
-
-3. **Install Rust** (required to build from source)
+2. **Install Rust** (required to build from source)
 
    Download and run the installer from [rustup.rs](https://rustup.rs/)
 
@@ -187,13 +186,13 @@ cargo build --release
 
 ```bash
 # Ubuntu/Debian
-sudo apt install ffmpeg mp3gain
+sudo apt install ffmpeg
 
 # Fedora
-sudo dnf install ffmpeg mp3gain
+sudo dnf install ffmpeg
 
 # Arch
-sudo pacman -S ffmpeg mp3gain
+sudo pacman -S ffmpeg
 ```
 
 #### Build from Source
@@ -227,7 +226,7 @@ The tool will guide you through:
 | Filename | Format | Bitrate (kbps) | LUFS | True Peak (dBTP) | Target (dBTP) | Headroom (dB) | Method | Effective Gain (dB) |
 |----------|--------|----------------|------|------------------|---------------|---------------|--------|---------------------|
 | track01.flac | Lossless | - | -13.3 | -3.2 | -0.5 | +2.7 | ffmpeg | +2.7 |
-| track04.mp3 | MP3 | 320 | -14.0 | -5.5 | -2.0 | +3.5 | mp3gain | +3.0 |
+| track04.mp3 | MP3 | 320 | -14.0 | -5.5 | -2.0 | +3.5 | native | +3.0 |
 | track06.mp3 | MP3 | 320 | -12.0 | -1.5 | -0.5 | +1.0 | re-encode | +1.0 |
 
 ### Backup Structure
@@ -249,22 +248,22 @@ The tool will guide you through:
 
 - **Files are overwritten in place** after backup — Rekordbox metadata remains linked
 - Only files with **positive effective gain** are shown and processed
-- MP3 mp3gain requires at least **1.5dB headroom to -2.0 dBTP** to be processed losslessly
+- MP3 native lossless requires at least **1.5dB headroom to -2.0 dBTP** to be processed
 - MP3 re-encoding is **opt-in** and requires explicit confirmation
 - macOS resource fork files (`._*`) are automatically ignored
 
 ## Technical Details
 
-### Why 1.5dB Steps for mp3gain?
+### Why 1.5dB Steps for Native MP3 Gain?
 
-The MP3 format stores a "global gain" value as an 8-bit integer (0-255). When decoding, samples are multiplied by `2^(gain/4)`:
+The MP3 format stores a "global_gain" value as an 8-bit integer (0-255). When decoding, samples are multiplied by `2^(gain/4)`:
 
-- +1 to global gain = `2^(1/4)` = **+1.5 dB**
-- -1 to global gain = `2^(-1/4)` = **-1.5 dB**
+- +1 to global_gain = `2^(1/4)` = **+1.5 dB**
+- -1 to global_gain = `2^(-1/4)` = **-1.5 dB**
 
-This is a fundamental limitation of the MP3 format, not a tool limitation.
+This is a fundamental limitation of the MP3 format, not a tool limitation. headroom's native Rust implementation directly manipulates this field in each MP3 frame's side information.
 
-### Why -2.0 dBTP for mp3gain?
+### Why -2.0 dBTP for Native MP3 Gain?
 
 With 1.5dB step limitation, we use a more conservative -2.0 dBTP ceiling:
 - Ensures the stepped gain doesn't overshoot the safe zone
@@ -283,13 +282,20 @@ At 320kbps, the re-encode introduces quantization noise below -90dB—far below 
 
 ### Processing Method Comparison
 
-| Method | Precision | Quality Loss | Reversible | Use Case |
-|--------|-----------|--------------|------------|----------|
-| ffmpeg (lossless) | Arbitrary | None | Backup only | FLAC, AIFF, WAV |
-| mp3gain | 1.5dB steps | **None** | **Yes** | MP3 with ≥3.5dB headroom |
-| ffmpeg re-encode | Arbitrary | Inaudible at ≥256kbps | Backup only | MP3 needing precise gain |
+| Method | Precision | Quality Loss | External Deps | Use Case |
+|--------|-----------|--------------|---------------|----------|
+| ffmpeg (lossless) | Arbitrary | None | ffmpeg | FLAC, AIFF, WAV |
+| native (MP3) | 1.5dB steps | **None** | None | MP3 with ≥3.5dB headroom |
+| ffmpeg re-encode | Arbitrary | Inaudible at ≥256kbps | ffmpeg | MP3 needing precise gain |
 
 ## Changelog
+
+### v1.0.0
+- **Pure Rust MP3 implementation**: Removed mp3gain external dependency
+- Native global_gain manipulation for lossless MP3 processing
+- Supports MPEG1/2/2.5 Layer III, stereo and mono
+- Handles ID3v2 tags automatically
+- Comprehensive test suite
 
 ### v0.5.2
 - **Fix version display**: Banner now shows correct version
