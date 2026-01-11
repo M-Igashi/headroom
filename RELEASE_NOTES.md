@@ -1,16 +1,15 @@
 ## What's Changed
 
-Documentation update to clarify mp3rgain dependency installation.
+Updated mp3rgain CLI invocation to match v0.3.0 flag-based interface.
 
-### Documentation
+### Changes
 
-- Clarified that mp3rgain is automatically installed as a Homebrew dependency on macOS
-- Added mp3rgain installation instructions for Windows and Linux (`cargo install mp3rgain`)
-- Updated website and llms.txt with correct dependency information
+- Updated mp3rgain command from subcommand style (`mp3rgain apply -g <steps> <file>`) to flag style (`mp3rgain -g <steps> <file>`)
+- Requires mp3rgain v0.3.0 or later
 
-### No Code Changes
+### Compatibility
 
-This release only updates documentation. The binary is identical to v1.1.0.
+This release requires **mp3rgain v0.3.0** which uses mp3gain-compatible flags instead of subcommands.
 
 ---
 

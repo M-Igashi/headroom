@@ -99,7 +99,6 @@ pub fn apply_gain_mp3_native(file_path: &Path, gain_steps: i32) -> Result<()> {
     
     let output = Command::new("mp3rgain")
         .args([
-            "apply",
             "-g",
             &gain_steps.to_string(),
             file_path.to_str().ok_or_else(|| anyhow!("Invalid path"))?,
