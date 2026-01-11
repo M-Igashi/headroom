@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::analyzer::{AudioAnalysis, GainMethod};
-use crate::mp3;
+
 
 pub struct ProcessResult {
     pub success: bool,
@@ -91,17 +91,25 @@ pub fn apply_gain_ffmpeg(file_path: &Path, gain_db: f64) -> Result<()> {
     Ok(())
 }
 
-/// Apply gain to MP3 files using pure Rust implementation (lossless, 1.5dB steps)
+/// Apply gain to MP3 files using mp3rgain CLI tool (lossless, 1.5dB steps)
 pub fn apply_gain_mp3_native(file_path: &Path, gain_steps: i32) -> Result<()> {
     if gain_steps == 0 {
         return Ok(());
     }
     
-    let frames_modified = mp3::apply_gain(file_path, gain_steps)
-        .with_context(|| format!("Failed to apply MP3 gain to {}", file_path.display()))?;
+    let output = Command::new("mp3rgain")
+        .args([
+            "apply",
+            "-g",
+            &gain_steps.to_string(),
+            file_path.to_str().ok_or_else(|| anyhow!("Invalid path"))?,
+        ])
+        .output()
+        .context("Failed to execute mp3rgain. Is it installed? (brew install M-Igashi/tap/mp3rgain)")?;
     
-    if frames_modified == 0 {
-        return Err(anyhow!("No MP3 frames found in file"));
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow!("mp3rgain failed: {}", stderr));
     }
     
     Ok(())

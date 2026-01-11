@@ -12,7 +12,7 @@ This tool is designed for DJs and producers who want to maximize loudness while 
 
 ## Key Features
 
-- **Pure Rust implementation**: No external dependencies except ffmpeg — MP3 lossless gain is handled natively
+- **External tools**: Uses [mp3rgain](https://github.com/M-Igashi/mp3rgain) CLI for lossless MP3 gain, ffmpeg for analysis & lossless formats
 - **Smart True Peak ceiling**: Based on AES TD1008, uses -0.5 dBTP for high-quality files, -1.0 dBTP for low-bitrate
 - **Three processing methods**: ffmpeg for lossless, native implementation for lossless MP3, re-encode for precise MP3 gain
 - **Non-destructive workflow**: Original files are backed up before processing
@@ -38,7 +38,7 @@ headroom intelligently chooses the best method for each MP3 file:
 For MP3 files with ≥1.5 dB headroom to bitrate-aware ceiling:
 - Truly lossless global_gain header modification
 - 1.5 dB step increments (MP3 format specification)
-- No external tools required
+- Uses mp3rgain CLI tool
 - ≥256kbps: -0.5 dBTP ceiling (requires TP ≤ -2.0 dBTP)
 - <256kbps: -1.0 dBTP ceiling (requires TP ≤ -2.5 dBTP)
 
@@ -263,7 +263,7 @@ The MP3 format stores a "global_gain" value as an 8-bit integer (0-255). When de
 - +1 to global_gain = `2^(1/4)` = **+1.5 dB**
 - -1 to global_gain = `2^(-1/4)` = **-1.5 dB**
 
-This is a fundamental limitation of the MP3 format, not a tool limitation. headroom's native Rust implementation directly manipulates this field in each MP3 frame's side information.
+This is a fundamental limitation of the MP3 format, not a tool limitation. headroom uses the [mp3rgain](https://github.com/M-Igashi/mp3rgain) CLI tool to directly manipulate this field in each MP3 frame's side information.
 
 ### Why Bitrate-Aware Ceiling for Native MP3?
 
