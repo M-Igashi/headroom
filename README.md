@@ -156,17 +156,18 @@ brew tap M-Igashi/tap
 brew install headroom
 ```
 
-That's it! ffmpeg is installed automatically as a dependency.
+That's it! ffmpeg and mp3rgain are installed automatically as dependencies.
 
 ### Windows
 
 #### Prerequisites
 
-1. **Install ffmpeg** (required for audio analysis)
+1. **Install ffmpeg and mp3rgain** (required dependencies)
 
    Using winget:
    ```powershell
    winget install ffmpeg
+   cargo install mp3rgain
    ```
 
 2. **Install Rust** (required to build from source)
@@ -195,6 +196,9 @@ sudo dnf install ffmpeg
 
 # Arch
 sudo pacman -S ffmpeg
+
+# Install mp3rgain (after installing Rust)
+cargo install mp3rgain
 ```
 
 #### Build from Source

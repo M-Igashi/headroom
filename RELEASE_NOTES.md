@@ -1,24 +1,16 @@
 ## What's Changed
 
-### Architecture Change: External mp3rgain CLI
+Documentation update to clarify mp3rgain dependency installation.
 
-v1.1.0 changes from using the mp3rgain Rust crate as a library dependency to calling the mp3rgain CLI tool externally.
+### Documentation
 
-### Highlights
+- Clarified that mp3rgain is automatically installed as a Homebrew dependency on macOS
+- Added mp3rgain installation instructions for Windows and Linux (`cargo install mp3rgain`)
+- Updated website and llms.txt with correct dependency information
 
-- **mp3rgain as external dependency**: Now calls `mp3rgain` CLI instead of embedding as Rust crate
-- **Homebrew dependency management**: `brew install headroom` automatically installs mp3rgain via tap
-- **Cleaner architecture**: Separation of concerns between headroom (orchestration) and mp3rgain (MP3 manipulation)
+### No Code Changes
 
-### Breaking Changes
-
-- Requires mp3rgain CLI to be installed (`brew install M-Igashi/tap/mp3rgain`)
-- Non-Homebrew users need to install mp3rgain separately
-
-### Dependencies
-
-- ffmpeg (audio analysis & lossless format processing)
-- mp3rgain (lossless MP3 gain adjustment)
+This release only updates documentation. The binary is identical to v1.1.0.
 
 ---
 
@@ -29,4 +21,4 @@ brew tap M-Igashi/tap
 brew install headroom
 ```
 
-Both ffmpeg and mp3rgain are installed automatically as dependencies.
+ffmpeg and mp3rgain are installed automatically as dependencies.
