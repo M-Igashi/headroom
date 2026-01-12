@@ -156,14 +156,63 @@ $ headroom
 
 ## Installation
 
-### macOS (Homebrew)
+### Quick Install
+
+| Platform | Command |
+|----------|---------|
+| **macOS** | `brew tap M-Igashi/tap && brew install headroom` |
+| **All platforms** | `cargo install headroom mp3rgain` + install ffmpeg |
+
+### Prerequisites
+
+headroom requires two external tools:
+- **ffmpeg**: For audio analysis and lossless format processing
+- **mp3rgain**: For lossless MP3 gain adjustment
+
+---
+
+### macOS (Homebrew) — Recommended
 
 ```bash
 brew tap M-Igashi/tap
 brew install headroom
 ```
 
-That's it! ffmpeg and mp3rgain are installed automatically as dependencies.
+ffmpeg and mp3rgain are installed automatically as dependencies.
+
+---
+
+### Cargo (All Platforms)
+
+If you have Rust installed, you can install headroom and mp3rgain via cargo:
+
+```bash
+cargo install headroom mp3rgain
+```
+
+Then install ffmpeg for your platform:
+
+```bash
+# macOS
+brew install ffmpeg
+
+# Ubuntu/Debian
+sudo apt install ffmpeg
+
+# Fedora
+sudo dnf install ffmpeg
+
+# Arch
+sudo pacman -S ffmpeg
+
+# Windows (winget)
+winget install ffmpeg
+
+# Windows (choco)
+choco install ffmpeg
+```
+
+---
 
 ### Pre-built Binaries
 
@@ -176,74 +225,31 @@ Download pre-built binaries from the [Releases](https://github.com/M-Igashi/head
 | Linux ARM64 | `headroom-vX.X.X-linux-aarch64.tar.gz` |
 | Windows x86_64 | `headroom-vX.X.X-windows-x86_64.zip` |
 
-**Note:** ffmpeg and mp3rgain must be installed separately on all platforms.
-
-### Windows
-
-#### Prerequisites
-
-1. **Install ffmpeg and mp3rgain** (required dependencies)
-
-   Using winget:
-   ```powershell
-   winget install ffmpeg
-   cargo install mp3rgain
-   ```
-
-2. **Install Rust** (required to build from source)
-
-   Download and run the installer from [rustup.rs](https://rustup.rs/)
-
-#### Option 1: Download Pre-built Binary
-
-Download `headroom-vX.X.X-windows-x86_64.zip` from [Releases](https://github.com/M-Igashi/headroom/releases) and extract it.
-
-#### Option 2: Build from Source
-
-```powershell
-git clone https://github.com/M-Igashi/headroom.git
-cd headroom
-cargo build --release
-# Binary at target\release\headroom.exe
-```
-
-### Linux
-
-#### Prerequisites
+**Note:** You must install ffmpeg and mp3rgain separately:
 
 ```bash
-# Ubuntu/Debian
-sudo apt install ffmpeg
-
-# Fedora
-sudo dnf install ffmpeg
-
-# Arch
-sudo pacman -S ffmpeg
-
-# Install mp3rgain (after installing Rust)
+# Install mp3rgain (requires Rust)
 cargo install mp3rgain
+
+# Install ffmpeg (see platform-specific commands above)
 ```
 
-#### Option 1: Download Pre-built Binary
+---
 
-Download the appropriate binary from [Releases](https://github.com/M-Igashi/headroom/releases):
-- `headroom-vX.X.X-linux-x86_64.tar.gz` for x86_64
-- `headroom-vX.X.X-linux-aarch64.tar.gz` for ARM64 (Raspberry Pi, etc.)
+### Build from Source
 
 ```bash
-tar -xzf headroom-vX.X.X-linux-x86_64.tar.gz
-cp headroom ~/.local/bin/
-```
-
-#### Option 2: Build from Source
-
-```bash
+# Install Rust (if not already installed)
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Clone and build
 git clone https://github.com/M-Igashi/headroom.git
 cd headroom
 cargo build --release
-cp target/release/headroom ~/.local/bin/
+
+# Binary location:
+# - Unix: target/release/headroom
+# - Windows: target\release\headroom.exe
 ```
 
 ## Usage
