@@ -3,6 +3,7 @@ use walkdir::WalkDir;
 
 const LOSSLESS_EXTENSIONS: &[&str] = &["flac", "aiff", "aif", "wav"];
 const MP3_EXTENSIONS: &[&str] = &["mp3"];
+const AAC_EXTENSIONS: &[&str] = &["m4a", "aac", "mp4"];
 
 pub fn scan_audio_files(dir: &Path) -> Vec<PathBuf> {
     WalkDir::new(dir)
@@ -15,15 +16,16 @@ pub fn scan_audio_files(dir: &Path) -> Vec<PathBuf> {
             if filename.starts_with("._") {
                 return false;
             }
-            
+
             // Check extension
             e.path()
                 .extension()
                 .and_then(|ext| ext.to_str())
                 .map(|ext| {
                     let ext_lower = ext.to_lowercase();
-                    LOSSLESS_EXTENSIONS.contains(&ext_lower.as_str()) 
+                    LOSSLESS_EXTENSIONS.contains(&ext_lower.as_str())
                         || MP3_EXTENSIONS.contains(&ext_lower.as_str())
+                        || AAC_EXTENSIONS.contains(&ext_lower.as_str())
                 })
                 .unwrap_or(false)
         })
@@ -34,6 +36,7 @@ pub fn scan_audio_files(dir: &Path) -> Vec<PathBuf> {
 pub fn get_supported_extensions() -> Vec<&'static str> {
     let mut exts: Vec<&str> = LOSSLESS_EXTENSIONS.to_vec();
     exts.extend(MP3_EXTENSIONS);
+    exts.extend(AAC_EXTENSIONS);
     exts
 }
 
@@ -49,5 +52,12 @@ pub fn is_lossless(path: &Path) -> bool {
     path.extension()
         .and_then(|ext| ext.to_str())
         .map(|ext| LOSSLESS_EXTENSIONS.contains(&ext.to_lowercase().as_str()))
+        .unwrap_or(false)
+}
+
+pub fn is_aac(path: &Path) -> bool {
+    path.extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| AAC_EXTENSIONS.contains(&ext.to_lowercase().as_str()))
         .unwrap_or(false)
 }

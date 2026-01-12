@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use console::{style, Style};
-use dialoguer::{Confirm, theme::ColorfulTheme};
+use dialoguer::{theme::ColorfulTheme, Confirm};
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use std::path::PathBuf;
@@ -13,47 +13,43 @@ use crate::scanner;
 
 pub fn run() -> Result<()> {
     print_banner();
-    
+
     // Check ffmpeg
     analyzer::check_ffmpeg()?;
-    
+
     // Use current directory
-    let target_dir = std::env::current_dir()
-        .context("Failed to get current directory")?;
-    
+    let target_dir = std::env::current_dir().context("Failed to get current directory")?;
+
     println!(
         "{} Target directory: {}",
         style("▸").cyan(),
         style(target_dir.display()).bold()
     );
-    
+
     // Scan for audio files (always includes MP3)
     let files = scanner::scan_audio_files(&target_dir);
-    
+
     if files.is_empty() {
-        println!(
-            "\n{} No audio files found",
-            style("⚠").yellow()
-        );
+        println!("\n{} No audio files found", style("⚠").yellow());
         println!(
             "  Supported formats: {}",
             scanner::get_supported_extensions().join(", ")
         );
         return Ok(());
     }
-    
+
     println!(
         "\n{} Found {} audio files",
         style("✓").green(),
         style(files.len()).cyan()
     );
-    
+
     // Analyze files
     let all_analyses = analyze_files(&files)?;
-    
+
     // Get summary
     let summary = AnalysisSummary::from_analyses(&all_analyses);
-    
+
     if !summary.has_processable() {
         println!(
             "\n{} No files with enough headroom found.",
@@ -62,27 +58,28 @@ pub fn run() -> Result<()> {
         println!("  All files are already at or above the target ceiling.");
         return Ok(());
     }
-    
+
     // Print categorized report
     report::print_analysis_report(&all_analyses);
-    
+
     // Export CSV (only processable files)
-    let processable_analyses: Vec<_> = all_analyses.iter()
+    let processable_analyses: Vec<_> = all_analyses
+        .iter()
         .filter(|a| a.has_headroom())
         .cloned()
         .collect();
-    
+
     let csv_path = report::generate_csv(&processable_analyses, &target_dir)?;
     println!(
         "{} Report saved: {}",
         style("✓").green(),
         csv_path.display()
     );
-    
+
     // Process based on available files
     let has_lossless = summary.total_lossless() > 0;
-    let has_reencode = summary.reencode_count > 0;
-    
+    let has_reencode = summary.total_reencode() > 0;
+
     // First dialog: Lossless processing
     if has_lossless {
         if !prompt_lossless_processing(&summary)? {
@@ -90,70 +87,78 @@ pub fn run() -> Result<()> {
             return Ok(());
         }
     }
-    
+
     // Second dialog: Re-encode processing (if applicable)
     let allow_reencode = if has_reencode {
         prompt_reencode_processing(&summary)?
     } else {
         false
     };
-    
+
     // Ask about backup
     let create_backup = Confirm::with_theme(&ColorfulTheme::default())
         .with_prompt("Create backup before processing?")
         .default(true)
         .interact()?;
-    
+
     // Create backup directory if needed
     let backup_dir = if create_backup {
         let dir = processor::create_backup_dir(&target_dir)?;
-        println!(
-            "{} Backup directory: {}",
-            style("✓").green(),
-            dir.display()
-        );
+        println!("{} Backup directory: {}", style("✓").green(), dir.display());
         Some(dir)
     } else {
         None
     };
-    
+
     // Filter files to process
-    let files_to_process: Vec<_> = all_analyses.iter()
-        .filter(|a| {
-            match a.gain_method {
-                GainMethod::FfmpegLossless => true,
-                GainMethod::Mp3Lossless => true,
-                GainMethod::Mp3Reencode => allow_reencode,
-                GainMethod::None => false,
-            }
+    let files_to_process: Vec<_> = all_analyses
+        .iter()
+        .filter(|a| match a.gain_method {
+            GainMethod::FfmpegLossless => true,
+            GainMethod::Mp3Lossless => true,
+            GainMethod::Mp3Reencode => allow_reencode,
+            GainMethod::AacReencode => allow_reencode,
+            GainMethod::None => false,
         })
         .collect();
-    
+
     if files_to_process.is_empty() {
         println!("No files to process.");
         return Ok(());
     }
-    
+
     // Process files
-    process_files(&files_to_process, &target_dir, backup_dir.as_deref(), allow_reencode)?;
-    
+    process_files(
+        &files_to_process,
+        &target_dir,
+        backup_dir.as_deref(),
+        allow_reencode,
+    )?;
+
     // Final summary
-    let processed_lossless = files_to_process.iter()
+    let processed_lossless = files_to_process
+        .iter()
         .filter(|a| matches!(a.gain_method, GainMethod::FfmpegLossless))
         .count();
-    let processed_mp3_lossless = files_to_process.iter()
+    let processed_mp3_lossless = files_to_process
+        .iter()
         .filter(|a| matches!(a.gain_method, GainMethod::Mp3Lossless))
         .count();
-    let processed_reencode = files_to_process.iter()
+    let processed_mp3_reencode = files_to_process
+        .iter()
         .filter(|a| matches!(a.gain_method, GainMethod::Mp3Reencode))
         .count();
-    
+    let processed_aac_reencode = files_to_process
+        .iter()
+        .filter(|a| matches!(a.gain_method, GainMethod::AacReencode))
+        .count();
+
     println!(
         "\n{} Done! {} files processed.",
         style("✓").green().bold(),
         files_to_process.len()
     );
-    
+
     if processed_lossless > 0 {
         println!(
             "  {} {} lossless files (ffmpeg)",
@@ -168,32 +173,42 @@ pub fn run() -> Result<()> {
             processed_mp3_lossless
         );
     }
-    if processed_reencode > 0 {
+    if processed_mp3_reencode > 0 {
         println!(
             "  {} {} MP3 files (re-encoded)",
             style("•").dim(),
-            processed_reencode
+            processed_mp3_reencode
         );
     }
-    
+    if processed_aac_reencode > 0 {
+        println!(
+            "  {} {} AAC/M4A files (re-encoded)",
+            style("•").dim(),
+            processed_aac_reencode
+        );
+    }
+
     Ok(())
 }
 
 fn prompt_lossless_processing(summary: &AnalysisSummary) -> Result<bool> {
     let mut prompt_parts = Vec::new();
-    
+
     if summary.lossless_count > 0 {
         prompt_parts.push(format!("{} lossless", summary.lossless_count));
     }
     if summary.mp3_lossless_count > 0 {
-        prompt_parts.push(format!("{} MP3 (lossless gain)", summary.mp3_lossless_count));
+        prompt_parts.push(format!(
+            "{} MP3 (lossless gain)",
+            summary.mp3_lossless_count
+        ));
     }
-    
+
     let prompt = format!(
         "Apply lossless gain adjustment to {} files?",
         prompt_parts.join(" + ")
     );
-    
+
     Confirm::with_theme(&ColorfulTheme::default())
         .with_prompt(&prompt)
         .default(false)
@@ -202,22 +217,27 @@ fn prompt_lossless_processing(summary: &AnalysisSummary) -> Result<bool> {
 }
 
 fn prompt_reencode_processing(summary: &AnalysisSummary) -> Result<bool> {
+    let mut reencode_parts = Vec::new();
+    if summary.mp3_reencode_count > 0 {
+        reencode_parts.push(format!("{} MP3", summary.mp3_reencode_count));
+    }
+    if summary.aac_reencode_count > 0 {
+        reencode_parts.push(format!("{} AAC/M4A", summary.aac_reencode_count));
+    }
+
     println!(
-        "\n{} {} MP3 files have headroom but require re-encoding for precise gain.",
+        "\n{} {} files have headroom but require re-encoding for precise gain.",
         style("ℹ").magenta(),
-        summary.reencode_count
+        reencode_parts.join(" + ")
     );
     println!(
         "  {} Re-encoding causes minor quality loss (inaudible at 256kbps+)",
         style("•").dim()
     );
-    println!(
-        "  {} Original bitrate will be preserved",
-        style("•").dim()
-    );
-    
+    println!("  {} Original bitrate will be preserved", style("•").dim());
+
     Confirm::with_theme(&ColorfulTheme::default())
-        .with_prompt("Also process these MP3 files with re-encoding?")
+        .with_prompt("Also process these files with re-encoding?")
         .default(false)
         .interact()
         .map_err(Into::into)
@@ -226,10 +246,22 @@ fn prompt_reencode_processing(summary: &AnalysisSummary) -> Result<bool> {
 fn print_banner() {
     let banner_style = Style::new().cyan().bold();
     println!();
-    println!("{}", banner_style.apply_to("╭─────────────────────────────────────╮"));
-    println!("{}", banner_style.apply_to("│          headroom v1.1.2            │"));
-    println!("{}", banner_style.apply_to("│   Audio Loudness Analyzer & Gain    │"));
-    println!("{}", banner_style.apply_to("╰─────────────────────────────────────╯"));
+    println!(
+        "{}",
+        banner_style.apply_to("╭─────────────────────────────────────╮")
+    );
+    println!(
+        "{}",
+        banner_style.apply_to("│          headroom v1.1.2            │")
+    );
+    println!(
+        "{}",
+        banner_style.apply_to("│   Audio Loudness Analyzer & Gain    │")
+    );
+    println!(
+        "{}",
+        banner_style.apply_to("╰─────────────────────────────────────╯")
+    );
     println!();
 }
 
@@ -241,11 +273,11 @@ fn analyze_files(files: &[PathBuf]) -> Result<Vec<AudioAnalysis>> {
             .unwrap()
             .progress_chars("█▓░"),
     );
-    
+
     // Thread-safe collection for results with index to preserve order
     let results: Mutex<Vec<(usize, Option<AudioAnalysis>)>> = Mutex::new(Vec::new());
     let errors: Mutex<Vec<String>> = Mutex::new(Vec::new());
-    
+
     // Parallel analysis using rayon
     files.par_iter().enumerate().for_each(|(idx, file)| {
         match analyzer::analyze_file(file) {
@@ -264,14 +296,14 @@ fn analyze_files(files: &[PathBuf]) -> Result<Vec<AudioAnalysis>> {
         }
         pb.inc(1);
     });
-    
+
     pb.finish_and_clear();
-    
+
     // Print any errors
     for err in errors.lock().unwrap().iter() {
         println!("{}", err);
     }
-    
+
     // Sort by original index and extract successful analyses
     let mut indexed_results = results.into_inner().unwrap();
     indexed_results.sort_by_key(|(idx, _)| *idx);
@@ -279,13 +311,9 @@ fn analyze_files(files: &[PathBuf]) -> Result<Vec<AudioAnalysis>> {
         .into_iter()
         .filter_map(|(_, analysis)| analysis)
         .collect();
-    
-    println!(
-        "{} Analyzed {} files",
-        style("✓").green(),
-        analyses.len()
-    );
-    
+
+    println!("{} Analyzed {} files", style("✓").green(), analyses.len());
+
     Ok(analyses)
 }
 
@@ -302,7 +330,7 @@ fn process_files(
             .unwrap()
             .progress_chars("█▓░"),
     );
-    
+
     for analysis in analyses {
         let result = processor::process_file(
             &analysis.path,
@@ -311,7 +339,7 @@ fn process_files(
             backup_dir,
             allow_reencode,
         );
-        
+
         if !result.success {
             if let Some(err) = result.error {
                 pb.println(format!(
@@ -324,8 +352,8 @@ fn process_files(
         }
         pb.inc(1);
     }
-    
+
     pb.finish_and_clear();
-    
+
     Ok(())
 }

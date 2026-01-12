@@ -9,51 +9,62 @@ pub fn generate_csv(analyses: &[AudioAnalysis], output_dir: &Path) -> Result<std
     let timestamp = Local::now().format("%Y%m%d_%H%M%S");
     let filename = format!("headroom_report_{}.csv", timestamp);
     let output_path = output_dir.join(&filename);
-    
-    let mut writer = csv::Writer::from_path(&output_path)
-        .context("Failed to create CSV file")?;
-    
+
+    let mut writer = csv::Writer::from_path(&output_path).context("Failed to create CSV file")?;
+
     // Write header
-    writer.write_record([
-        "Filename", 
-        "Format", 
-        "Bitrate (kbps)",
-        "LUFS", 
-        "True Peak (dBTP)", 
-        "Target (dBTP)", 
-        "Headroom (dB)", 
-        "Method",
-        "Effective Gain (dB)"
-    ]).context("Failed to write CSV header")?;
-    
+    writer
+        .write_record([
+            "Filename",
+            "Format",
+            "Bitrate (kbps)",
+            "LUFS",
+            "True Peak (dBTP)",
+            "Target (dBTP)",
+            "Headroom (dB)",
+            "Method",
+            "Effective Gain (dB)",
+        ])
+        .context("Failed to write CSV header")?;
+
     // Write data
     for analysis in analyses {
-        let format = if analysis.is_mp3 { "MP3" } else { "Lossless" };
-        let bitrate = analysis.bitrate_kbps
+        let format = if analysis.is_mp3 {
+            "MP3"
+        } else if analysis.is_aac {
+            "AAC"
+        } else {
+            "Lossless"
+        };
+        let bitrate = analysis
+            .bitrate_kbps
             .map(|b| b.to_string())
             .unwrap_or_else(|| "-".to_string());
         let method = match analysis.gain_method {
             GainMethod::FfmpegLossless => "ffmpeg",
             GainMethod::Mp3Lossless => "native",
             GainMethod::Mp3Reencode => "re-encode",
+            GainMethod::AacReencode => "re-encode",
             GainMethod::None => "none",
         };
-        
-        writer.write_record([
-            &analysis.filename,
-            format,
-            &bitrate,
-            &format!("{:.1}", analysis.input_i),
-            &format!("{:.1}", analysis.input_tp),
-            &format!("{:.1}", analysis.target_tp),
-            &format!("{:+.1}", analysis.headroom),
-            method,
-            &format!("{:+.1}", analysis.effective_gain),
-        ]).context("Failed to write CSV record")?;
+
+        writer
+            .write_record([
+                &analysis.filename,
+                format,
+                &bitrate,
+                &format!("{:.1}", analysis.input_i),
+                &format!("{:.1}", analysis.input_tp),
+                &format!("{:.1}", analysis.target_tp),
+                &format!("{:+.1}", analysis.headroom),
+                method,
+                &format!("{:+.1}", analysis.effective_gain),
+            ])
+            .context("Failed to write CSV record")?;
     }
-    
+
     writer.flush().context("Failed to flush CSV")?;
-    
+
     Ok(output_path)
 }
 
@@ -63,18 +74,25 @@ pub fn print_analysis_report(analyses: &[AudioAnalysis]) {
     let mp3_lossless_style = Style::new().yellow();
     let reencode_style = Style::new().magenta();
     let dim_style = Style::new().dim();
-    
+
     // Categorize files
-    let lossless_files: Vec<_> = analyses.iter()
+    let lossless_files: Vec<_> = analyses
+        .iter()
         .filter(|a| matches!(a.gain_method, GainMethod::FfmpegLossless))
         .collect();
-    let mp3_lossless_files: Vec<_> = analyses.iter()
+    let mp3_lossless_files: Vec<_> = analyses
+        .iter()
         .filter(|a| matches!(a.gain_method, GainMethod::Mp3Lossless))
         .collect();
-    let reencode_files: Vec<_> = analyses.iter()
+    let mp3_reencode_files: Vec<_> = analyses
+        .iter()
         .filter(|a| matches!(a.gain_method, GainMethod::Mp3Reencode))
         .collect();
-    
+    let aac_reencode_files: Vec<_> = analyses
+        .iter()
+        .filter(|a| matches!(a.gain_method, GainMethod::AacReencode))
+        .collect();
+
     // Calculate column width
     let all_processable: Vec<_> = analyses.iter().filter(|a| a.has_headroom()).collect();
     let filename_width = all_processable
@@ -84,9 +102,9 @@ pub fn print_analysis_report(analyses: &[AudioAnalysis]) {
         .unwrap_or(8)
         .max(8)
         .min(40);
-    
+
     println!();
-    
+
     // Print lossless files section
     if !lossless_files.is_empty() {
         println!(
@@ -97,7 +115,7 @@ pub fn print_analysis_report(analyses: &[AudioAnalysis]) {
         print_file_table(&lossless_files, filename_width, &lossless_style);
         println!();
     }
-    
+
     // Print MP3 lossless gain section
     if !mp3_lossless_files.is_empty() {
         println!(
@@ -108,20 +126,34 @@ pub fn print_analysis_report(analyses: &[AudioAnalysis]) {
         print_file_table(&mp3_lossless_files, filename_width, &mp3_lossless_style);
         println!();
     }
-    
-    // Print re-encode section
-    if !reencode_files.is_empty() {
+
+    // Print MP3 re-encode section
+    if !mp3_reencode_files.is_empty() {
         println!(
             "{} {} MP3 files (re-encode required for precise gain)",
             reencode_style.apply_to("●"),
-            header_style.apply_to(format!("{}", reencode_files.len()))
+            header_style.apply_to(format!("{}", mp3_reencode_files.len()))
         );
-        print_file_table(&reencode_files, filename_width, &reencode_style);
+        print_file_table(&mp3_reencode_files, filename_width, &reencode_style);
         println!();
     }
-    
+
+    // Print AAC re-encode section
+    if !aac_reencode_files.is_empty() {
+        println!(
+            "{} {} AAC/M4A files (re-encode required)",
+            reencode_style.apply_to("●"),
+            header_style.apply_to(format!("{}", aac_reencode_files.len()))
+        );
+        print_file_table(&aac_reencode_files, filename_width, &reencode_style);
+        println!();
+    }
+
     // Summary
-    let total = lossless_files.len() + mp3_lossless_files.len() + reencode_files.len();
+    let total = lossless_files.len()
+        + mp3_lossless_files.len()
+        + mp3_reencode_files.len()
+        + aac_reencode_files.len();
     if total == 0 {
         println!(
             "{} No files with available headroom found.",
@@ -132,7 +164,7 @@ pub fn print_analysis_report(analyses: &[AudioAnalysis]) {
 
 fn print_file_table(files: &[&AudioAnalysis], filename_width: usize, accent_style: &Style) {
     let dim_style = Style::new().dim();
-    
+
     // Print header
     println!(
         "  {:<width$} {:>8} {:>12} {:>10} {:>12}",
@@ -143,18 +175,18 @@ fn print_file_table(files: &[&AudioAnalysis], filename_width: usize, accent_styl
         dim_style.apply_to("Gain"),
         width = filename_width,
     );
-    
+
     // Print rows
     for analysis in files {
         let display_name: String = if analysis.filename.len() > filename_width {
-            format!("{}…", &analysis.filename[..filename_width-1])
+            format!("{}…", &analysis.filename[..filename_width - 1])
         } else {
             analysis.filename.clone()
         };
-        
+
         let gain_str = format!("{:+.1} dB", analysis.effective_gain);
         let target_str = format!("{:.1}", analysis.target_tp);
-        
+
         println!(
             "  {:<width$} {:>8.1} {:>10.1} dBTP {:>8} dBTP {:>12}",
             display_name,
@@ -171,32 +203,47 @@ fn print_file_table(files: &[&AudioAnalysis], filename_width: usize, accent_styl
 pub struct AnalysisSummary {
     pub lossless_count: usize,
     pub mp3_lossless_count: usize,
-    pub reencode_count: usize,
+    pub mp3_reencode_count: usize,
+    pub aac_reencode_count: usize,
 }
 
 impl AnalysisSummary {
     pub fn from_analyses(analyses: &[AudioAnalysis]) -> Self {
         Self {
-            lossless_count: analyses.iter()
+            lossless_count: analyses
+                .iter()
                 .filter(|a| matches!(a.gain_method, GainMethod::FfmpegLossless))
                 .count(),
-            mp3_lossless_count: analyses.iter()
+            mp3_lossless_count: analyses
+                .iter()
                 .filter(|a| matches!(a.gain_method, GainMethod::Mp3Lossless))
                 .count(),
-            reencode_count: analyses.iter()
+            mp3_reencode_count: analyses
+                .iter()
                 .filter(|a| matches!(a.gain_method, GainMethod::Mp3Reencode))
+                .count(),
+            aac_reencode_count: analyses
+                .iter()
+                .filter(|a| matches!(a.gain_method, GainMethod::AacReencode))
                 .count(),
         }
     }
-    
+
     pub fn total_lossless(&self) -> usize {
         self.lossless_count + self.mp3_lossless_count
     }
-    
-    pub fn total(&self) -> usize {
-        self.lossless_count + self.mp3_lossless_count + self.reencode_count
+
+    pub fn total_reencode(&self) -> usize {
+        self.mp3_reencode_count + self.aac_reencode_count
     }
-    
+
+    pub fn total(&self) -> usize {
+        self.lossless_count
+            + self.mp3_lossless_count
+            + self.mp3_reencode_count
+            + self.aac_reencode_count
+    }
+
     pub fn has_processable(&self) -> bool {
         self.total() > 0
     }
