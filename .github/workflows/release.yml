@@ -9,14 +9,18 @@ permissions:
   contents: write
 
 jobs:
+  # =============================================================================
+  # Build Jobs
+  # =============================================================================
+
   build-macos:
     runs-on: macos-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@4be9e76fd7c4901c61fb841f559994984270fce7 # stable
+        uses: dtolnay/rust-toolchain@56f84321dbccf38fb67ce29ab63e4754056677e0 # stable
 
       - name: Add targets
         run: |
@@ -53,7 +57,7 @@ jobs:
           echo "SHA256=$SHA256" >> $GITHUB_OUTPUT
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: macos-universal
           path: release/headroom-${{ steps.version.outputs.VERSION }}-macos-universal.tar.gz
@@ -62,7 +66,7 @@ jobs:
         run: echo "${{ steps.sha256.outputs.SHA256 }}" > sha256-macos-universal.txt
 
       - name: Upload SHA256
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: sha256-macos-universal
           path: sha256-macos-universal.txt
@@ -71,10 +75,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@4be9e76fd7c4901c61fb841f559994984270fce7 # stable
+        uses: dtolnay/rust-toolchain@56f84321dbccf38fb67ce29ab63e4754056677e0 # stable
 
       - name: Build
         run: cargo build --release
@@ -97,7 +101,7 @@ jobs:
           echo "SHA256=$SHA256" >> $GITHUB_OUTPUT
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: linux-x86_64
           path: release/headroom-${{ steps.version.outputs.VERSION }}-linux-x86_64.tar.gz
@@ -106,7 +110,7 @@ jobs:
         run: echo "${{ steps.sha256.outputs.SHA256 }}" > sha256-linux-x86_64.txt
 
       - name: Upload SHA256
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: sha256-linux-x86_64
           path: sha256-linux-x86_64.txt
@@ -115,10 +119,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@4be9e76fd7c4901c61fb841f559994984270fce7 # stable
+        uses: dtolnay/rust-toolchain@56f84321dbccf38fb67ce29ab63e4754056677e0 # stable
 
       - name: Install cross
         run: cargo install cross --git https://github.com/cross-rs/cross
@@ -144,7 +148,7 @@ jobs:
           echo "SHA256=$SHA256" >> $GITHUB_OUTPUT
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: linux-aarch64
           path: release/headroom-${{ steps.version.outputs.VERSION }}-linux-aarch64.tar.gz
@@ -153,7 +157,7 @@ jobs:
         run: echo "${{ steps.sha256.outputs.SHA256 }}" > sha256-linux-aarch64.txt
 
       - name: Upload SHA256
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: sha256-linux-aarch64
           path: sha256-linux-aarch64.txt
@@ -162,10 +166,10 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@4be9e76fd7c4901c61fb841f559994984270fce7 # stable
+        uses: dtolnay/rust-toolchain@56f84321dbccf38fb67ce29ab63e4754056677e0 # stable
 
       - name: Build
         run: cargo build --release
@@ -190,7 +194,7 @@ jobs:
           echo "SHA256=$hash" >> $env:GITHUB_OUTPUT
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: windows-x86_64
           path: release/headroom-${{ steps.version.outputs.VERSION }}-windows-x86_64.zip
@@ -200,24 +204,36 @@ jobs:
         run: echo "${{ steps.sha256.outputs.SHA256 }}" > sha256-windows-x86_64.txt
 
       - name: Upload SHA256
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: sha256-windows-x86_64
           path: sha256-windows-x86_64.txt
 
+  # =============================================================================
+  # Release Job - Create GitHub Release
+  # =============================================================================
+
   release:
     needs: [build-macos, build-linux-x86_64, build-linux-aarch64, build-windows]
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.VERSION }}
+      version_num: ${{ steps.version.outputs.VERSION_NUM }}
+      macos_sha256: ${{ steps.macos_sha256.outputs.SHA256 }}
+      windows_sha256: ${{ steps.windows_sha256.outputs.SHA256 }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - name: Get version
         id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/}"
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "VERSION_NUM=${VERSION#v}" >> $GITHUB_OUTPUT
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: artifacts
 
@@ -238,10 +254,16 @@ jobs:
           cat ../artifacts/sha256-windows-x86_64/sha256-windows-x86_64.txt | while read hash; do echo "$hash  headroom-${{ steps.version.outputs.VERSION }}-windows-x86_64.zip"; done >> checksums.txt
           mv checksums.txt headroom-${{ steps.version.outputs.VERSION }}-checksums.txt
 
-      - name: Get macOS SHA256 for Homebrew
+      - name: Get macOS SHA256
         id: macos_sha256
         run: |
           SHA256=$(cat artifacts/sha256-macos-universal/sha256-macos-universal.txt)
+          echo "SHA256=$SHA256" >> $GITHUB_OUTPUT
+
+      - name: Get Windows SHA256
+        id: windows_sha256
+        run: |
+          SHA256=$(cat artifacts/sha256-windows-x86_64/sha256-windows-x86_64.txt)
           echo "SHA256=$SHA256" >> $GITHUB_OUTPUT
 
       - name: Check for release notes
@@ -255,7 +277,7 @@ jobs:
 
       - name: Create Release (with custom notes)
         if: steps.release_notes.outputs.exists == 'true'
-        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2
+        uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631 # v2
         with:
           files: |
             release/headroom-${{ steps.version.outputs.VERSION }}-macos-universal.tar.gz
@@ -268,7 +290,7 @@ jobs:
 
       - name: Create Release (auto-generated notes)
         if: steps.release_notes.outputs.exists == 'false'
-        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2
+        uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631 # v2
         with:
           files: |
             release/headroom-${{ steps.version.outputs.VERSION }}-macos-universal.tar.gz
@@ -280,44 +302,63 @@ jobs:
           body: |
             ## Installation
 
-            ### macOS (Homebrew)
-            ```bash
-            brew tap M-Igashi/tap
-            brew install headroom
-            ```
-
-            ### Linux / Windows
-            Download the appropriate binary below and extract it.
+            | Platform | Command |
+            |----------|---------|
+            | **macOS (Homebrew)** | `brew install M-Igashi/tap/headroom` |
+            | **Windows (Scoop)** | `scoop bucket add headroom https://github.com/M-Igashi/scoop-bucket && scoop install headroom` |
+            | **Windows (winget)** | `winget install M-Igashi.headroom` |
+            | **Cargo** | `cargo install headroom` |
 
             **Dependencies:** ffmpeg and mp3rgain must be installed separately.
 
             ## Checksums
             See `headroom-${{ steps.version.outputs.VERSION }}-checksums.txt` for SHA256 checksums of all binaries.
 
-      - name: Get Windows SHA256 for Scoop
-        id: windows_sha256
-        run: |
-          SHA256=$(cat artifacts/sha256-windows-x86_64/sha256-windows-x86_64.txt)
-          echo "SHA256=$SHA256" >> $GITHUB_OUTPUT
+  # =============================================================================
+  # Publish to Cargo (crates.io)
+  # =============================================================================
 
+  publish-cargo:
+    needs: [release]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@56f84321dbccf38fb67ce29ab63e4754056677e0 # stable
+
+      - name: Publish to crates.io
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish --token $CARGO_REGISTRY_TOKEN
+
+  # =============================================================================
+  # Update Homebrew (macOS)
+  # =============================================================================
+
+  update-homebrew:
+    needs: [release]
+    runs-on: ubuntu-latest
+    steps:
       - name: Update Homebrew formula
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
-          VERSION="${{ steps.version.outputs.VERSION }}"
-          VERSION_NUM="${VERSION#v}"
-          SHA256="${{ steps.macos_sha256.outputs.SHA256 }}"
+          VERSION="${{ needs.release.outputs.version }}"
+          VERSION_NUM="${{ needs.release.outputs.version_num }}"
+          SHA256="${{ needs.release.outputs.macos_sha256 }}"
 
           git clone https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/M-Igashi/homebrew-tap.git
           cd homebrew-tap
 
-          cat > Formula/headroom.rb << FORMULA
+          cat > Formula/headroom.rb << 'FORMULA'
           class Headroom < Formula
             desc "Audio loudness analyzer and gain adjustment tool for mastering and DJ workflows"
             homepage "https://github.com/M-Igashi/headroom"
-            url "https://github.com/M-Igashi/headroom/releases/download/${VERSION}/headroom-${VERSION}-macos-universal.tar.gz"
-            sha256 "${SHA256}"
-            version "${VERSION_NUM}"
+            url "https://github.com/M-Igashi/headroom/releases/download/VERSION_PLACEHOLDER/headroom-VERSION_PLACEHOLDER-macos-universal.tar.gz"
+            sha256 "SHA256_PLACEHOLDER"
+            version "VERSION_NUM_PLACEHOLDER"
             license "MIT"
 
             depends_on "ffmpeg"
@@ -327,10 +368,14 @@ jobs:
             end
 
             test do
-              assert_match "headroom", shell_output("#{bin}/headroom 2>&1", 1)
+              assert_match "headroom", shell_output("#{bin}/headroom --version")
             end
           end
           FORMULA
+
+          sed -i "s|VERSION_PLACEHOLDER|${VERSION}|g" Formula/headroom.rb
+          sed -i "s|SHA256_PLACEHOLDER|${SHA256}|g" Formula/headroom.rb
+          sed -i "s|VERSION_NUM_PLACEHOLDER|${VERSION_NUM}|g" Formula/headroom.rb
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -338,13 +383,21 @@ jobs:
           git commit -m "headroom ${VERSION_NUM}"
           git push
 
+  # =============================================================================
+  # Update Scoop (Windows)
+  # =============================================================================
+
+  update-scoop:
+    needs: [release]
+    runs-on: ubuntu-latest
+    steps:
       - name: Update Scoop bucket
         env:
           SCOOP_BUCKET_TOKEN: ${{ secrets.SCOOP_BUCKET_TOKEN }}
         run: |
-          VERSION="${{ steps.version.outputs.VERSION }}"
-          VERSION_NUM="${VERSION#v}"
-          SHA256="${{ steps.windows_sha256.outputs.SHA256 }}"
+          VERSION="${{ needs.release.outputs.version }}"
+          VERSION_NUM="${{ needs.release.outputs.version_num }}"
+          SHA256="${{ needs.release.outputs.windows_sha256 }}"
 
           git clone https://x-access-token:${SCOOP_BUCKET_TOKEN}@github.com/M-Igashi/scoop-bucket.git
           cd scoop-bucket
@@ -364,7 +417,7 @@ jobs:
               },
               "depends": "ffmpeg",
               "suggest": {
-                  "mp3rgain (for lossless MP3 gain)": "cargo install mp3rgain"
+                  "mp3rgain (for lossless MP3 gain)": "M-Igashi/scoop-bucket/mp3rgain"
               },
               "checkver": {
                   "github": "https://github.com/M-Igashi/headroom"
