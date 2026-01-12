@@ -14,7 +14,7 @@ This tool is designed for DJs and producers who want to maximize loudness while 
 
 - **External tools**: Uses [mp3rgain](https://github.com/M-Igashi/mp3rgain) CLI for lossless MP3 gain, ffmpeg for analysis & lossless formats
 - **Smart True Peak ceiling**: Based on AES TD1008, uses -0.5 dBTP for high-quality files, -1.0 dBTP for low-bitrate
-- **Three processing methods**: ffmpeg for lossless, native implementation for lossless MP3, re-encode for precise MP3 gain
+- **Multiple processing methods**: ffmpeg for lossless, native implementation for lossless MP3, re-encode for precise MP3/AAC gain
 - **Non-destructive workflow**: Original files are backed up before processing
 - **Metadata preservation**: Files are overwritten in place, so Rekordbox tags, cue points, and other metadata remain intact
 - **No limiter**: Pure gain adjustment only — dynamics are preserved
@@ -29,6 +29,7 @@ This tool is designed for DJs and producers who want to maximize loudness while 
 | WAV | .wav | ffmpeg | Arbitrary | Lossless re-encode |
 | MP3 | .mp3 | native | 1.5dB steps | Truly lossless (global_gain modification) |
 | MP3 | .mp3 | ffmpeg re-encode | Arbitrary | For files needing precise gain |
+| AAC/M4A | .m4a, .aac, .mp4 | ffmpeg re-encode | Arbitrary | Always requires re-encode |
 
 ## MP3 Processing: Three-Tier Approach
 
@@ -51,25 +52,23 @@ For MP3 files with headroom but <1.5 dB to ceiling:
 ### 3. Skip (No headroom)
 Files already at or above the target ceiling are not processed.
 
-### Why Re-encode MP3 is Safe at High Bitrates
+## AAC/M4A Processing
 
-A common concern is quality loss when re-encoding MP3. However, for **gain adjustment only** at high bitrates (≥256 kbps), the degradation is **inaudible to human ears**:
+AAC/M4A files are supported with the following characteristics:
 
-**Technical explanation:**
-- MP3 encoding introduces quantization noise primarily in high frequencies (>16kHz)
-- At 320kbps, the available bit budget is sufficient to preserve nearly all audible content
-- A single re-encode with only gain adjustment (no EQ, no dynamics) produces a waveform nearly identical to the original
-- ABX testing consistently shows listeners cannot distinguish 320kbps→320kbps re-encodes
+- **Always requires re-encoding**: Unlike MP3, AAC has no lossless gain adjustment mechanism
+- **Bitrate-aware ceiling**: Same strategy as MP3 re-encode (-0.5 dBTP for ≥256kbps, -1.0 dBTP for lower)
+- **High-quality encoder**: Prefers libfdk_aac when available, falls back to built-in aac encoder
+- **Preserves original bitrate**: Maintains audio quality matching the source file
+- **Grouped with MP3 re-encode**: AAC files are processed together with MP3 re-encode files in the second confirmation stage
 
-**What matters:**
-- Original bitrate: ≥256kbps recommended
-- Processing: Gain only (no additional filtering)
-- Encode quality: headroom uses libmp3lame with highest quality settings
+### Why Re-encode AAC is Safe at High Bitrates
 
-**Why we still offer the choice:**
-- Some users prefer the "zero re-encode" principle
-- Native lossless is truly bit-perfect for the audio data
-- Re-encode is opt-in with clear explanation
+Same principles apply as MP3 re-encoding:
+- At ≥256kbps, quantization noise stays below -90dB (inaudible)
+- Only gain is applied (no EQ, compression, or dynamics processing)
+- Original bitrate is preserved
+- Requires explicit user opt-in
 
 ## True Peak Ceiling Strategy
 
@@ -82,19 +81,21 @@ Based on [AES TD1008](https://www.aes.org/technical/documentDownloads.cfm?docID=
 | MP3 <256kbps (native) | native | **-1.0 dBTP** | Requires TP ≤ -2.5 dBTP for 1.5dB steps |
 | MP3 ≥256kbps (re-encode) | ffmpeg | **-0.5 dBTP** | High-bitrate codecs have minimal overshoot |
 | MP3 <256kbps (re-encode) | ffmpeg | **-1.0 dBTP** | Lower bitrates cause more codec overshoot |
+| AAC ≥256kbps | ffmpeg | **-0.5 dBTP** | High-bitrate AAC has minimal overshoot |
+| AAC <256kbps | ffmpeg | **-1.0 dBTP** | Lower bitrates cause more codec overshoot |
 
 ## How It Works
 
-1. Scans the current directory for audio files (FLAC, AIFF, WAV, MP3)
+1. Scans the current directory for audio files (FLAC, AIFF, WAV, MP3, AAC/M4A)
 2. Measures LUFS (Integrated Loudness) and True Peak using ffmpeg
 3. Categorizes files by processing method:
    - **Green**: Lossless files (ffmpeg)
    - **Yellow**: MP3 files with enough headroom for native lossless gain
-   - **Magenta**: MP3 files requiring re-encode
+   - **Magenta**: MP3/AAC files requiring re-encode
 4. Displays categorized report
 5. Two-stage confirmation:
    - First: "Apply lossless gain adjustment?" (lossless + native MP3)
-   - Second: "Also process MP3 files with re-encoding?" (optional)
+   - Second: "Also process files with re-encoding?" (MP3/AAC requiring re-encode)
 6. Creates backups and processes files
 
 ### Example
@@ -104,14 +105,14 @@ $ cd ~/Music/DJ-Tracks
 $ headroom
 
 ╭─────────────────────────────────────╮
-│          headroom v1.0.0            │
+│          headroom v1.2.0            │
 │   Audio Loudness Analyzer & Gain    │
 ╰─────────────────────────────────────╯
 
 ▸ Target directory: /Users/xxx/Music/DJ-Tracks
 
-✓ Found 24 audio files
-✓ Analyzed 24 files
+✓ Found 28 audio files
+✓ Analyzed 28 files
 
 ● 3 lossless files (ffmpeg, precise gain)
   Filename        LUFS    True Peak    Target        Gain
@@ -129,22 +130,28 @@ $ headroom
   track06.mp3    -12.0    -1.5 dBTP   -0.5 dBTP   +1.0 dB
   track07.mp3    -11.5    -1.2 dBTP   -0.5 dBTP   +0.7 dB
 
+● 2 AAC/M4A files (re-encode required)
+  Filename        LUFS    True Peak    Target        Gain
+  track08.m4a    -13.0    -2.5 dBTP   -0.5 dBTP   +2.0 dB
+  track09.m4a    -12.5    -1.8 dBTP   -0.5 dBTP   +1.3 dB
+
 ✓ Report saved: ./headroom_report_20250109_123456.csv
 
 ? Apply lossless gain adjustment to 3 lossless + 2 MP3 (lossless gain) files? [y/N] y
 
-ℹ 2 MP3 files have headroom but require re-encoding for precise gain.
+ℹ 2 MP3 + 2 AAC/M4A files have headroom but require re-encoding for precise gain.
   • Re-encoding causes minor quality loss (inaudible at 256kbps+)
   • Original bitrate will be preserved
-? Also process these MP3 files with re-encoding? [y/N] y
+? Also process these files with re-encoding? [y/N] y
 
 ? Create backup before processing? [Y/n] y
 ✓ Backup directory: ./backup
 
-✓ Done! 7 files processed.
+✓ Done! 9 files processed.
   • 3 lossless files (ffmpeg)
   • 2 MP3 files (native, lossless)
   • 2 MP3 files (re-encoded)
+  • 2 AAC/M4A files (re-encoded)
 ```
 
 ## Installation
@@ -157,6 +164,19 @@ brew install headroom
 ```
 
 That's it! ffmpeg and mp3rgain are installed automatically as dependencies.
+
+### Pre-built Binaries
+
+Download pre-built binaries from the [Releases](https://github.com/M-Igashi/headroom/releases) page:
+
+| Platform | File |
+|----------|------|
+| macOS (Universal) | `headroom-vX.X.X-macos-universal.tar.gz` |
+| Linux x86_64 | `headroom-vX.X.X-linux-x86_64.tar.gz` |
+| Linux ARM64 | `headroom-vX.X.X-linux-aarch64.tar.gz` |
+| Windows x86_64 | `headroom-vX.X.X-windows-x86_64.zip` |
+
+**Note:** ffmpeg and mp3rgain must be installed separately on all platforms.
 
 ### Windows
 
@@ -174,7 +194,11 @@ That's it! ffmpeg and mp3rgain are installed automatically as dependencies.
 
    Download and run the installer from [rustup.rs](https://rustup.rs/)
 
-#### Build from Source
+#### Option 1: Download Pre-built Binary
+
+Download `headroom-vX.X.X-windows-x86_64.zip` from [Releases](https://github.com/M-Igashi/headroom/releases) and extract it.
+
+#### Option 2: Build from Source
 
 ```powershell
 git clone https://github.com/M-Igashi/headroom.git
@@ -201,7 +225,18 @@ sudo pacman -S ffmpeg
 cargo install mp3rgain
 ```
 
-#### Build from Source
+#### Option 1: Download Pre-built Binary
+
+Download the appropriate binary from [Releases](https://github.com/M-Igashi/headroom/releases):
+- `headroom-vX.X.X-linux-x86_64.tar.gz` for x86_64
+- `headroom-vX.X.X-linux-aarch64.tar.gz` for ARM64 (Raspberry Pi, etc.)
+
+```bash
+tar -xzf headroom-vX.X.X-linux-x86_64.tar.gz
+cp headroom ~/.local/bin/
+```
+
+#### Option 2: Build from Source
 
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
@@ -222,7 +257,7 @@ The tool will guide you through:
 1. Scanning and analyzing all audio files
 2. Reviewing the categorized report
 3. Confirming lossless processing
-4. Optionally enabling MP3 re-encoding
+4. Optionally enabling MP3/AAC re-encoding
 5. Creating backups (recommended)
 
 ## Output
@@ -234,18 +269,21 @@ The tool will guide you through:
 | track01.flac | Lossless | - | -13.3 | -3.2 | -0.5 | +2.7 | ffmpeg | +2.7 |
 | track04.mp3 | MP3 | 320 | -14.0 | -5.5 | -2.0 | +3.5 | native | +3.0 |
 | track06.mp3 | MP3 | 320 | -12.0 | -1.5 | -0.5 | +1.0 | re-encode | +1.0 |
+| track08.m4a | AAC | 256 | -13.0 | -2.5 | -0.5 | +2.0 | re-encode | +2.0 |
 
 ### Backup Structure
 
 ```
 ./
 ├── track01.flac             ← Modified
-├── track04.mp3              ← Modified  
+├── track04.mp3              ← Modified
+├── track08.m4a              ← Modified
 ├── subfolder/
 │   └── track06.mp3          ← Modified
 └── backup/                  ← Created by headroom
     ├── track01.flac         ← Original
     ├── track04.mp3          ← Original
+    ├── track08.m4a          ← Original
     └── subfolder/
         └── track06.mp3      ← Original
 ```
@@ -255,7 +293,7 @@ The tool will guide you through:
 - **Files are overwritten in place** after backup — Rekordbox metadata remains linked
 - Only files with **positive effective gain** are shown and processed
 - MP3 native lossless requires at least **1.5dB headroom to -2.0 dBTP** to be processed
-- MP3 re-encoding is **opt-in** and requires explicit confirmation
+- MP3/AAC re-encoding is **opt-in** and requires explicit confirmation
 - macOS resource fork files (`._*`) are automatically ignored
 
 ## Technical Details
@@ -277,23 +315,28 @@ With 1.5dB step limitation, the ceiling is calculated based on bitrate to match 
 - Example: 320kbps file at -3.5 dBTP gets 2 steps (+3.0dB) → -0.5 dBTP (optimal)
 - Example: 128kbps file at -3.5 dBTP gets 1 step (+1.5dB) → -2.0 dBTP (within -1.0 ceiling)
 
-### MP3 Re-encode Quality
+### Why AAC Always Requires Re-encoding
+
+Unlike MP3, AAC doesn't have a lossless gain adjustment mechanism like the global_gain field. The only way to apply gain to AAC files is through re-encoding. However, at high bitrates (≥256kbps), the quality loss is imperceptible.
+
+### MP3/AAC Re-encode Quality
 
 When re-encoding is chosen:
-- Uses `libmp3lame` encoder (highest quality)
+- **MP3**: Uses `libmp3lame` encoder with `-q:a 0` (best VBR quality)
+- **AAC**: Prefers `libfdk_aac` (highest quality), falls back to built-in `aac` encoder
 - Preserves original bitrate
-- Uses `-q:a 0` (best VBR quality)
 - Only applies volume filter (no other processing)
 
 At 320kbps, the re-encode introduces quantization noise below -90dB—far below audible threshold.
 
 ### Processing Method Comparison
 
-| Method | Precision | Quality Loss | External Deps | Use Case |
-|--------|-----------|--------------|---------------|----------|
-| ffmpeg (lossless) | Arbitrary | None | ffmpeg | FLAC, AIFF, WAV |
-| native (MP3) | 1.5dB steps | **None** | None | MP3 with ≥1.5dB to bitrate ceiling |
-| ffmpeg re-encode | Arbitrary | Inaudible at ≥256kbps | ffmpeg | MP3 needing precise gain |
+| Method | Format | Precision | Quality Loss | External Deps | Use Case |
+|--------|--------|-----------|--------------|---------------|----------|
+| ffmpeg (lossless) | FLAC, AIFF, WAV | Arbitrary | None | ffmpeg | Lossless files |
+| native (MP3) | MP3 | 1.5dB steps | **None** | mp3rgain | MP3 with ≥1.5dB to bitrate ceiling |
+| ffmpeg re-encode | MP3 | Arbitrary | Inaudible at ≥256kbps | ffmpeg | MP3 needing precise gain |
+| ffmpeg re-encode | AAC/M4A | Arbitrary | Inaudible at ≥256kbps | ffmpeg | AAC files (always) |
 
 ## Contributing
 

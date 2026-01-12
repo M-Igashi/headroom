@@ -3,13 +3,13 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 permissions:
   contents: write
 
 jobs:
-  build-and-release:
+  build-macos:
     runs-on: macos-latest
     steps:
       - name: Checkout
@@ -52,6 +52,198 @@ jobs:
           SHA256=$(shasum -a 256 release/headroom-${{ steps.version.outputs.VERSION }}-macos-universal.tar.gz | awk '{print $1}')
           echo "SHA256=$SHA256" >> $GITHUB_OUTPUT
 
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-universal
+          path: release/headroom-${{ steps.version.outputs.VERSION }}-macos-universal.tar.gz
+
+      - name: Save SHA256
+        run: echo "${{ steps.sha256.outputs.SHA256 }}" > sha256-macos-universal.txt
+
+      - name: Upload SHA256
+        uses: actions/upload-artifact@v4
+        with:
+          name: sha256-macos-universal
+          path: sha256-macos-universal.txt
+
+  build-linux-x86_64:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Get version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Create tarball
+        run: |
+          mkdir -p release
+          cp target/release/headroom release/
+          cd release
+          tar -czvf headroom-${{ steps.version.outputs.VERSION }}-linux-x86_64.tar.gz headroom
+
+      - name: Calculate SHA256
+        id: sha256
+        run: |
+          SHA256=$(sha256sum release/headroom-${{ steps.version.outputs.VERSION }}-linux-x86_64.tar.gz | awk '{print $1}')
+          echo "SHA256=$SHA256" >> $GITHUB_OUTPUT
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86_64
+          path: release/headroom-${{ steps.version.outputs.VERSION }}-linux-x86_64.tar.gz
+
+      - name: Save SHA256
+        run: echo "${{ steps.sha256.outputs.SHA256 }}" > sha256-linux-x86_64.txt
+
+      - name: Upload SHA256
+        uses: actions/upload-artifact@v4
+        with:
+          name: sha256-linux-x86_64
+          path: sha256-linux-x86_64.txt
+
+  build-linux-aarch64:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
+
+      - name: Build with cross
+        run: cross build --release --target aarch64-unknown-linux-gnu
+
+      - name: Get version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Create tarball
+        run: |
+          mkdir -p release
+          cp target/aarch64-unknown-linux-gnu/release/headroom release/
+          cd release
+          tar -czvf headroom-${{ steps.version.outputs.VERSION }}-linux-aarch64.tar.gz headroom
+
+      - name: Calculate SHA256
+        id: sha256
+        run: |
+          SHA256=$(sha256sum release/headroom-${{ steps.version.outputs.VERSION }}-linux-aarch64.tar.gz | awk '{print $1}')
+          echo "SHA256=$SHA256" >> $GITHUB_OUTPUT
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-aarch64
+          path: release/headroom-${{ steps.version.outputs.VERSION }}-linux-aarch64.tar.gz
+
+      - name: Save SHA256
+        run: echo "${{ steps.sha256.outputs.SHA256 }}" > sha256-linux-aarch64.txt
+
+      - name: Upload SHA256
+        uses: actions/upload-artifact@v4
+        with:
+          name: sha256-linux-aarch64
+          path: sha256-linux-aarch64.txt
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Get version
+        id: version
+        shell: bash
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Create zip
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path release
+          Copy-Item target\release\headroom.exe release\
+          Compress-Archive -Path release\headroom.exe -DestinationPath release\headroom-${{ steps.version.outputs.VERSION }}-windows-x86_64.zip
+
+      - name: Calculate SHA256
+        id: sha256
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash release\headroom-${{ steps.version.outputs.VERSION }}-windows-x86_64.zip -Algorithm SHA256).Hash.ToLower()
+          echo "SHA256=$hash" >> $env:GITHUB_OUTPUT
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x86_64
+          path: release/headroom-${{ steps.version.outputs.VERSION }}-windows-x86_64.zip
+
+      - name: Save SHA256
+        shell: bash
+        run: echo "${{ steps.sha256.outputs.SHA256 }}" > sha256-windows-x86_64.txt
+
+      - name: Upload SHA256
+        uses: actions/upload-artifact@v4
+        with:
+          name: sha256-windows-x86_64
+          path: sha256-windows-x86_64.txt
+
+  release:
+    needs: [build-macos, build-linux-x86_64, build-linux-aarch64, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release
+          mv artifacts/macos-universal/*.tar.gz release/
+          mv artifacts/linux-x86_64/*.tar.gz release/
+          mv artifacts/linux-aarch64/*.tar.gz release/
+          mv artifacts/windows-x86_64/*.zip release/
+
+      - name: Create checksums file
+        run: |
+          cd release
+          cat ../artifacts/sha256-macos-universal/sha256-macos-universal.txt | while read hash; do echo "$hash  headroom-${{ steps.version.outputs.VERSION }}-macos-universal.tar.gz"; done > checksums.txt
+          cat ../artifacts/sha256-linux-x86_64/sha256-linux-x86_64.txt | while read hash; do echo "$hash  headroom-${{ steps.version.outputs.VERSION }}-linux-x86_64.tar.gz"; done >> checksums.txt
+          cat ../artifacts/sha256-linux-aarch64/sha256-linux-aarch64.txt | while read hash; do echo "$hash  headroom-${{ steps.version.outputs.VERSION }}-linux-aarch64.tar.gz"; done >> checksums.txt
+          cat ../artifacts/sha256-windows-x86_64/sha256-windows-x86_64.txt | while read hash; do echo "$hash  headroom-${{ steps.version.outputs.VERSION }}-windows-x86_64.zip"; done >> checksums.txt
+          mv checksums.txt headroom-${{ steps.version.outputs.VERSION }}-checksums.txt
+
+      - name: Get macOS SHA256 for Homebrew
+        id: macos_sha256
+        run: |
+          SHA256=$(cat artifacts/sha256-macos-universal/sha256-macos-universal.txt)
+          echo "SHA256=$SHA256" >> $GITHUB_OUTPUT
+
       - name: Check for release notes
         id: release_notes
         run: |
@@ -65,7 +257,12 @@ jobs:
         if: steps.release_notes.outputs.exists == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          files: release/headroom-${{ steps.version.outputs.VERSION }}-macos-universal.tar.gz
+          files: |
+            release/headroom-${{ steps.version.outputs.VERSION }}-macos-universal.tar.gz
+            release/headroom-${{ steps.version.outputs.VERSION }}-linux-x86_64.tar.gz
+            release/headroom-${{ steps.version.outputs.VERSION }}-linux-aarch64.tar.gz
+            release/headroom-${{ steps.version.outputs.VERSION }}-windows-x86_64.zip
+            release/headroom-${{ steps.version.outputs.VERSION }}-checksums.txt
           body_path: RELEASE_NOTES.md
           append_body: true
 
@@ -73,20 +270,29 @@ jobs:
         if: steps.release_notes.outputs.exists == 'false'
         uses: softprops/action-gh-release@v2
         with:
-          files: release/headroom-${{ steps.version.outputs.VERSION }}-macos-universal.tar.gz
+          files: |
+            release/headroom-${{ steps.version.outputs.VERSION }}-macos-universal.tar.gz
+            release/headroom-${{ steps.version.outputs.VERSION }}-linux-x86_64.tar.gz
+            release/headroom-${{ steps.version.outputs.VERSION }}-linux-aarch64.tar.gz
+            release/headroom-${{ steps.version.outputs.VERSION }}-windows-x86_64.zip
+            release/headroom-${{ steps.version.outputs.VERSION }}-checksums.txt
           generate_release_notes: true
           body: |
             ## Installation
 
+            ### macOS (Homebrew)
             ```bash
             brew tap M-Igashi/tap
             brew install headroom
             ```
 
-            ## SHA256
-            ```
-            ${{ steps.sha256.outputs.SHA256 }}  headroom-${{ steps.version.outputs.VERSION }}-macos-universal.tar.gz
-            ```
+            ### Linux / Windows
+            Download the appropriate binary below and extract it.
+
+            **Dependencies:** ffmpeg and mp3rgain must be installed separately.
+
+            ## Checksums
+            See `headroom-${{ steps.version.outputs.VERSION }}-checksums.txt` for SHA256 checksums of all binaries.
 
       - name: Update Homebrew formula
         env:
@@ -94,11 +300,11 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.VERSION }}"
           VERSION_NUM="${VERSION#v}"
-          SHA256="${{ steps.sha256.outputs.SHA256 }}"
-          
+          SHA256="${{ steps.macos_sha256.outputs.SHA256 }}"
+
           git clone https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/M-Igashi/homebrew-tap.git
           cd homebrew-tap
-          
+
           cat > Formula/headroom.rb << FORMULA
           class Headroom < Formula
             desc "Audio loudness analyzer and gain adjustment tool for mastering and DJ workflows"
@@ -119,7 +325,7 @@ jobs:
             end
           end
           FORMULA
-          
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Formula/headroom.rb
