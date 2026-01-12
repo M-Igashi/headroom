@@ -162,7 +162,7 @@ $ headroom
 |----------|---------|
 | **macOS** | `brew tap M-Igashi/tap && brew install headroom` |
 | **Windows (Scoop)** | `scoop bucket add headroom https://github.com/M-Igashi/scoop-bucket && scoop install headroom` |
-| **Windows (winget)** | `winget install M-Igashi.headroom` + install ffmpeg & mp3rgain |
+| **Windows (winget)** | `winget install M-Igashi.headroom` *(pending approval)* |
 | **All platforms** | `cargo install headroom mp3rgain` + install ffmpeg |
 
 ### Prerequisites
@@ -200,6 +200,8 @@ cargo install mp3rgain
 ---
 
 ### Windows (winget)
+
+> **Note:** winget package is pending approval. See [PR #329680](https://github.com/microsoft/winget-pkgs/pull/329680).
 
 ```powershell
 winget install M-Igashi.headroom
