@@ -1,0 +1,27 @@
+{
+    "version": "1.2.0",
+    "description": "Audio loudness analyzer and gain adjustment tool for mastering and DJ workflows",
+    "homepage": "https://github.com/M-Igashi/headroom",
+    "license": "MIT",
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/M-Igashi/headroom/releases/download/v1.2.0/headroom-v1.2.0-windows-x86_64.zip",
+            "hash": "",
+            "bin": "headroom.exe"
+        }
+    },
+    "depends": "ffmpeg",
+    "suggest": {
+        "mp3rgain (for lossless MP3 gain)": "cargo install mp3rgain"
+    },
+    "checkver": {
+        "github": "https://github.com/M-Igashi/headroom"
+    },
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/M-Igashi/headroom/releases/download/v$version/headroom-v$version-windows-x86_64.zip"
+            }
+        }
+    }
+}

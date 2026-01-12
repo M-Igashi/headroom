@@ -161,6 +161,8 @@ $ headroom
 | Platform | Command |
 |----------|---------|
 | **macOS** | `brew tap M-Igashi/tap && brew install headroom` |
+| **Windows (Scoop)** | `scoop bucket add headroom https://github.com/M-Igashi/scoop-bucket && scoop install headroom` |
+| **Windows (winget)** | `winget install M-Igashi.headroom` + install ffmpeg & mp3rgain |
 | **All platforms** | `cargo install headroom mp3rgain` + install ffmpeg |
 
 ### Prerequisites
@@ -179,6 +181,36 @@ brew install headroom
 ```
 
 ffmpeg and mp3rgain are installed automatically as dependencies.
+
+---
+
+### Windows (Scoop)
+
+```powershell
+scoop bucket add headroom https://github.com/M-Igashi/scoop-bucket
+scoop install headroom
+```
+
+ffmpeg is installed automatically as a dependency. Install mp3rgain separately:
+
+```powershell
+cargo install mp3rgain
+```
+
+---
+
+### Windows (winget)
+
+```powershell
+winget install M-Igashi.headroom
+```
+
+Then install dependencies:
+
+```powershell
+winget install ffmpeg
+cargo install mp3rgain
+```
 
 ---
 
