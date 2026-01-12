@@ -1,5 +1,4 @@
-# Created using winget-create
-# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.12.0.schema.json
 
 PackageIdentifier: M-Igashi.headroom
 PackageVersion: 1.2.0
@@ -20,15 +19,6 @@ Description: |-
 
   This tool is designed for DJs and producers who want to maximize loudness while preserving
   dynamics, ensuring tracks hit the optimal True Peak ceiling without clipping.
-
-  Key Features:
-  - Uses mp3rgain CLI for lossless MP3 gain, ffmpeg for analysis & lossless formats
-  - Smart True Peak ceiling based on AES TD1008 recommendations
-  - Multiple processing methods: ffmpeg for lossless formats, mp3rgain for lossless MP3
-  - Non-destructive workflow with automatic backups
-  - Metadata preservation: Rekordbox tags, cue points remain intact
-  - No limiter: Pure gain adjustment only - dynamics are preserved
-  - Interactive CLI with two-stage confirmation
 Moniker: headroom
 Tags:
   - audio
@@ -45,4 +35,4 @@ Tags:
   - aac
 ReleaseNotesUrl: https://github.com/M-Igashi/headroom/releases/tag/v1.2.0
 ManifestType: defaultLocale
-ManifestVersion: 1.6.0
+ManifestVersion: 1.12.0
