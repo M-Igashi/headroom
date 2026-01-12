@@ -14,7 +14,7 @@ This tool is designed for DJs and producers who want to maximize loudness while 
 
 - **External tools**: Uses [mp3rgain](https://github.com/M-Igashi/mp3rgain) CLI for lossless MP3 gain, ffmpeg for analysis & lossless formats
 - **Smart True Peak ceiling**: Based on AES TD1008, uses -0.5 dBTP for high-quality files, -1.0 dBTP for low-bitrate
-- **Multiple processing methods**: ffmpeg for lossless, native implementation for lossless MP3, re-encode for precise MP3/AAC gain
+- **Multiple processing methods**: ffmpeg for lossless formats, mp3rgain for lossless MP3, ffmpeg re-encode for precise MP3/AAC gain
 - **Non-destructive workflow**: Original files are backed up before processing
 - **Metadata preservation**: Files are overwritten in place, so Rekordbox tags, cue points, and other metadata remain intact
 - **No limiter**: Pure gain adjustment only — dynamics are preserved
@@ -27,7 +27,7 @@ This tool is designed for DJs and producers who want to maximize loudness while 
 | FLAC | .flac | ffmpeg | Arbitrary | Lossless re-encode |
 | AIFF | .aiff, .aif | ffmpeg | Arbitrary | Lossless re-encode |
 | WAV | .wav | ffmpeg | Arbitrary | Lossless re-encode |
-| MP3 | .mp3 | native | 1.5dB steps | Truly lossless (global_gain modification) |
+| MP3 | .mp3 | mp3rgain | 1.5dB steps | Truly lossless (global_gain modification) |
 | MP3 | .mp3 | ffmpeg re-encode | Arbitrary | For files needing precise gain |
 | AAC/M4A | .m4a, .aac, .mp4 | ffmpeg re-encode | Arbitrary | Always requires re-encode |
 
@@ -77,8 +77,8 @@ Based on [AES TD1008](https://www.aes.org/technical/documentDownloads.cfm?docID=
 | Format | Method | Ceiling | Rationale |
 |--------|--------|---------|-----------|
 | Lossless (FLAC, AIFF, WAV) | ffmpeg | **-0.5 dBTP** | Will be distributed via high-bitrate streaming |
-| MP3 ≥256kbps (native) | native | **-0.5 dBTP** | Requires TP ≤ -2.0 dBTP for 1.5dB steps |
-| MP3 <256kbps (native) | native | **-1.0 dBTP** | Requires TP ≤ -2.5 dBTP for 1.5dB steps |
+| MP3 ≥256kbps (lossless) | mp3rgain | **-0.5 dBTP** | Requires TP ≤ -2.0 dBTP for 1.5dB steps |
+| MP3 <256kbps (lossless) | mp3rgain | **-1.0 dBTP** | Requires TP ≤ -2.5 dBTP for 1.5dB steps |
 | MP3 ≥256kbps (re-encode) | ffmpeg | **-0.5 dBTP** | High-bitrate codecs have minimal overshoot |
 | MP3 <256kbps (re-encode) | ffmpeg | **-1.0 dBTP** | Lower bitrates cause more codec overshoot |
 | AAC ≥256kbps | ffmpeg | **-0.5 dBTP** | High-bitrate AAC has minimal overshoot |
@@ -267,7 +267,7 @@ The tool will guide you through:
 | Filename | Format | Bitrate (kbps) | LUFS | True Peak (dBTP) | Target (dBTP) | Headroom (dB) | Method | Effective Gain (dB) |
 |----------|--------|----------------|------|------------------|---------------|---------------|--------|---------------------|
 | track01.flac | Lossless | - | -13.3 | -3.2 | -0.5 | +2.7 | ffmpeg | +2.7 |
-| track04.mp3 | MP3 | 320 | -14.0 | -5.5 | -2.0 | +3.5 | native | +3.0 |
+| track04.mp3 | MP3 | 320 | -14.0 | -5.5 | -2.0 | +3.5 | mp3rgain | +3.0 |
 | track06.mp3 | MP3 | 320 | -12.0 | -1.5 | -0.5 | +1.0 | re-encode | +1.0 |
 | track08.m4a | AAC | 256 | -13.0 | -2.5 | -0.5 | +2.0 | re-encode | +2.0 |
 
@@ -334,7 +334,7 @@ At 320kbps, the re-encode introduces quantization noise below -90dB—far below 
 | Method | Format | Precision | Quality Loss | External Deps | Use Case |
 |--------|--------|-----------|--------------|---------------|----------|
 | ffmpeg (lossless) | FLAC, AIFF, WAV | Arbitrary | None | ffmpeg | Lossless files |
-| native (MP3) | MP3 | 1.5dB steps | **None** | mp3rgain | MP3 with ≥1.5dB to bitrate ceiling |
+| mp3rgain (lossless) | MP3 | 1.5dB steps | **None** | mp3rgain | MP3 with ≥1.5dB to bitrate ceiling |
 | ffmpeg re-encode | MP3 | Arbitrary | Inaudible at ≥256kbps | ffmpeg | MP3 needing precise gain |
 | ffmpeg re-encode | AAC/M4A | Arbitrary | Inaudible at ≥256kbps | ffmpeg | AAC files (always) |
 
