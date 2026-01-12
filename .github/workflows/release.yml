@@ -16,7 +16,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@4be9e76fd7c4901c61fb841f559994984270fce7  # stable
 
       - name: Add targets
         run: |
@@ -74,7 +74,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@4be9e76fd7c4901c61fb841f559994984270fce7  # stable
 
       - name: Build
         run: cargo build --release
@@ -118,7 +118,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@4be9e76fd7c4901c61fb841f559994984270fce7  # stable
 
       - name: Install cross
         run: cargo install cross --git https://github.com/cross-rs/cross
@@ -165,7 +165,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@4be9e76fd7c4901c61fb841f559994984270fce7  # stable
 
       - name: Build
         run: cargo build --release
@@ -255,7 +255,7 @@ jobs:
 
       - name: Create Release (with custom notes)
         if: steps.release_notes.outputs.exists == 'true'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b  # v2
         with:
           files: |
             release/headroom-${{ steps.version.outputs.VERSION }}-macos-universal.tar.gz
@@ -268,7 +268,7 @@ jobs:
 
       - name: Create Release (auto-generated notes)
         if: steps.release_notes.outputs.exists == 'false'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b  # v2
         with:
           files: |
             release/headroom-${{ steps.version.outputs.VERSION }}-macos-universal.tar.gz
