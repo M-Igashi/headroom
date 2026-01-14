@@ -314,6 +314,9 @@ jobs:
             ## Checksums
             See `headroom-${{ steps.version.outputs.VERSION }}-checksums.txt` for SHA256 checksums of all binaries.
 
+            ## Note
+            mp3rgain is now built-in as a library dependency. No separate installation required.
+
   # =============================================================================
   # Publish to Cargo (crates.io)
   # =============================================================================
@@ -367,6 +370,13 @@ jobs:
               bin.install "headroom"
             end
 
+            def caveats
+              <<~EOS
+                mp3rgain is now built-in as a library dependency.
+                No separate installation required for lossless MP3 gain adjustment.
+              EOS
+            end
+
             test do
               assert_match "headroom", shell_output("#{bin}/headroom --version")
             end
@@ -416,9 +426,7 @@ jobs:
                   }
               },
               "depends": "ffmpeg",
-              "suggest": {
-                  "mp3rgain (for lossless MP3 gain)": "M-Igashi/scoop-bucket/mp3rgain"
-              },
+              "notes": "mp3rgain is now built-in as a library dependency. No separate installation required.",
               "checkver": {
                   "github": "https://github.com/M-Igashi/headroom"
               },

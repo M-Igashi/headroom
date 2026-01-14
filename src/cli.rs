@@ -252,7 +252,7 @@ fn print_banner() {
     );
     println!(
         "{}",
-        banner_style.apply_to("│          headroom v1.2.0            │")
+        banner_style.apply_to("│          headroom v1.3.0            │")
     );
     println!(
         "{}",

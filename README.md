@@ -12,7 +12,7 @@ This tool is designed for DJs and producers who want to maximize loudness while 
 
 ## Key Features
 
-- **External tools**: Uses [mp3rgain](https://github.com/M-Igashi/mp3rgain) CLI for lossless MP3 gain, ffmpeg for analysis & lossless formats
+- **Built-in mp3rgain**: Uses [mp3rgain](https://github.com/M-Igashi/mp3rgain) library (built-in) for lossless MP3 gain, ffmpeg for analysis & lossless formats
 - **Smart True Peak ceiling**: Based on AES TD1008, uses -0.5 dBTP for high-quality files, -1.0 dBTP for low-bitrate
 - **Multiple processing methods**: ffmpeg for lossless formats, mp3rgain for lossless MP3, ffmpeg re-encode for precise MP3/AAC gain
 - **Non-destructive workflow**: Original files are backed up before processing
@@ -105,7 +105,7 @@ $ cd ~/Music/DJ-Tracks
 $ headroom
 
 ╭─────────────────────────────────────╮
-│          headroom v1.2.0            │
+│          headroom v1.3.0            │
 │   Audio Loudness Analyzer & Gain    │
 ╰─────────────────────────────────────╯
 
@@ -163,13 +163,14 @@ $ headroom
 | **macOS** | `brew tap M-Igashi/tap && brew install headroom` |
 | **Windows (Scoop)** | `scoop bucket add headroom https://github.com/M-Igashi/scoop-bucket && scoop install headroom` |
 | **Windows (winget)** | `winget install M-Igashi.headroom` *(pending approval)* |
-| **All platforms** | `cargo install headroom mp3rgain` + install ffmpeg |
+| **All platforms** | `cargo install headroom` + install ffmpeg |
 
 ### Prerequisites
 
-headroom requires two external tools:
+headroom requires one external tool:
 - **ffmpeg**: For audio analysis and lossless format processing
-- **mp3rgain**: For lossless MP3 gain adjustment
+
+> **Note:** mp3rgain is now built-in as a library dependency. No separate installation required.
 
 ---
 
@@ -180,7 +181,7 @@ brew tap M-Igashi/tap
 brew install headroom
 ```
 
-ffmpeg and mp3rgain are installed automatically as dependencies.
+ffmpeg is installed automatically as a dependency. mp3rgain is built-in.
 
 ---
 
@@ -191,11 +192,7 @@ scoop bucket add headroom https://github.com/M-Igashi/scoop-bucket
 scoop install headroom
 ```
 
-ffmpeg is installed automatically as a dependency. Install mp3rgain separately:
-
-```powershell
-cargo install mp3rgain
-```
+ffmpeg is installed automatically as a dependency. mp3rgain is built-in.
 
 ---
 
@@ -207,21 +204,20 @@ cargo install mp3rgain
 winget install M-Igashi.headroom
 ```
 
-Then install dependencies:
+Then install ffmpeg:
 
 ```powershell
 winget install ffmpeg
-cargo install mp3rgain
 ```
 
 ---
 
 ### Cargo (All Platforms)
 
-If you have Rust installed, you can install headroom and mp3rgain via cargo:
+If you have Rust installed, you can install headroom via cargo:
 
 ```bash
-cargo install headroom mp3rgain
+cargo install headroom
 ```
 
 Then install ffmpeg for your platform:
@@ -259,14 +255,7 @@ Download pre-built binaries from the [Releases](https://github.com/M-Igashi/head
 | Linux ARM64 | `headroom-vX.X.X-linux-aarch64.tar.gz` |
 | Windows x86_64 | `headroom-vX.X.X-windows-x86_64.zip` |
 
-**Note:** You must install ffmpeg and mp3rgain separately:
-
-```bash
-# Install mp3rgain (requires Rust)
-cargo install mp3rgain
-
-# Install ffmpeg (see platform-specific commands above)
-```
+**Note:** You must install ffmpeg separately (see platform-specific commands above). mp3rgain is built-in.
 
 ---
 
@@ -345,7 +334,7 @@ The MP3 format stores a "global_gain" value as an 8-bit integer (0-255). When de
 - +1 to global_gain = `2^(1/4)` = **+1.5 dB**
 - -1 to global_gain = `2^(-1/4)` = **-1.5 dB**
 
-This is a fundamental limitation of the MP3 format, not a tool limitation. headroom uses the [mp3rgain](https://github.com/M-Igashi/mp3rgain) CLI tool to directly manipulate this field in each MP3 frame's side information.
+This is a fundamental limitation of the MP3 format, not a tool limitation. headroom uses the [mp3rgain](https://github.com/M-Igashi/mp3rgain) library (built-in) to directly manipulate this field in each MP3 frame's side information.
 
 ### Why Bitrate-Aware Ceiling for Native MP3?
 
