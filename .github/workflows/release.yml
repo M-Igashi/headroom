@@ -21,6 +21,8 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@56f84321dbccf38fb67ce29ab63e4754056677e0 # stable
+        with:
+          toolchain: stable
 
       - name: Add targets
         run: |
@@ -79,6 +81,8 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@56f84321dbccf38fb67ce29ab63e4754056677e0 # stable
+        with:
+          toolchain: stable
 
       - name: Build
         run: cargo build --release
@@ -123,6 +127,8 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@56f84321dbccf38fb67ce29ab63e4754056677e0 # stable
+        with:
+          toolchain: stable
 
       - name: Install cross
         run: cargo install cross --git https://github.com/cross-rs/cross
@@ -170,6 +176,8 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@56f84321dbccf38fb67ce29ab63e4754056677e0 # stable
+        with:
+          toolchain: stable
 
       - name: Build
         run: cargo build --release
@@ -330,6 +338,8 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@56f84321dbccf38fb67ce29ab63e4754056677e0 # stable
+        with:
+          toolchain: stable
 
       - name: Publish to crates.io
         env:
