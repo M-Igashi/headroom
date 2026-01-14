@@ -2,8 +2,6 @@
 
 Audio loudness analyzer and gain adjustment tool for mastering and DJ workflows.
 
-⭐ **If this tool helps your DJ workflow, please consider giving it a star!** It helps others discover the project.
-
 ## What is this?
 
 **headroom** simulates the behavior of Rekordbox's Auto Gain feature, but with a key difference: it identifies files with available headroom (True Peak below the target ceiling) and applies gain adjustment **without using a limiter**.
@@ -12,9 +10,9 @@ This tool is designed for DJs and producers who want to maximize loudness while 
 
 ## Key Features
 
-- **Built-in mp3rgain**: Uses [mp3rgain](https://github.com/M-Igashi/mp3rgain) library (built-in) for lossless MP3 gain, ffmpeg for analysis & lossless formats
+- **Single binary**: mp3rgain is built-in as a library — only ffmpeg required as external dependency
 - **Smart True Peak ceiling**: Based on AES TD1008, uses -0.5 dBTP for high-quality files, -1.0 dBTP for low-bitrate
-- **Multiple processing methods**: ffmpeg for lossless formats, mp3rgain for lossless MP3, ffmpeg re-encode for precise MP3/AAC gain
+- **Multiple processing methods**: ffmpeg for lossless formats, built-in mp3rgain for lossless MP3, ffmpeg re-encode for precise MP3/AAC gain
 - **Non-destructive workflow**: Original files are backed up before processing
 - **Metadata preservation**: Files are overwritten in place, so Rekordbox tags, cue points, and other metadata remain intact
 - **No limiter**: Pure gain adjustment only — dynamics are preserved
@@ -27,7 +25,7 @@ This tool is designed for DJs and producers who want to maximize loudness while 
 | FLAC | .flac | ffmpeg | Arbitrary | Lossless re-encode |
 | AIFF | .aiff, .aif | ffmpeg | Arbitrary | Lossless re-encode |
 | WAV | .wav | ffmpeg | Arbitrary | Lossless re-encode |
-| MP3 | .mp3 | mp3rgain | 1.5dB steps | Truly lossless (global_gain modification) |
+| MP3 | .mp3 | mp3rgain (built-in) | 1.5dB steps | Truly lossless (global_gain modification) |
 | MP3 | .mp3 | ffmpeg re-encode | Arbitrary | For files needing precise gain |
 | AAC/M4A | .m4a, .aac, .mp4 | ffmpeg re-encode | Arbitrary | Always requires re-encode |
 
@@ -35,11 +33,11 @@ This tool is designed for DJs and producers who want to maximize loudness while 
 
 headroom intelligently chooses the best method for each MP3 file:
 
-### 1. Native Lossless (Pure Rust, bitrate-aware ceiling)
+### 1. Native Lossless (Built-in mp3rgain, bitrate-aware ceiling)
 For MP3 files with ≥1.5 dB headroom to bitrate-aware ceiling:
 - Truly lossless global_gain header modification
 - 1.5 dB step increments (MP3 format specification)
-- Uses mp3rgain CLI tool
+- Uses built-in [mp3rgain](https://github.com/M-Igashi/mp3rgain) library
 - ≥256kbps: -0.5 dBTP ceiling (requires TP ≤ -2.0 dBTP)
 - <256kbps: -1.0 dBTP ceiling (requires TP ≤ -2.5 dBTP)
 
@@ -160,9 +158,9 @@ $ headroom
 
 | Platform | Command |
 |----------|---------|
-| **macOS** | `brew tap M-Igashi/tap && brew install headroom` |
+| **macOS** | `brew install M-Igashi/tap/headroom` |
 | **Windows (Scoop)** | `scoop bucket add headroom https://github.com/M-Igashi/scoop-bucket && scoop install headroom` |
-| **Windows (winget)** | `winget install M-Igashi.headroom` *(pending approval)* |
+| **Windows (winget)** | `winget install M-Igashi.headroom` |
 | **All platforms** | `cargo install headroom` + install ffmpeg |
 
 ### Prerequisites
@@ -170,18 +168,17 @@ $ headroom
 headroom requires one external tool:
 - **ffmpeg**: For audio analysis and lossless format processing
 
-> **Note:** mp3rgain is now built-in as a library dependency. No separate installation required.
+> **Note:** As of v1.3.0, mp3rgain is built-in as a library dependency. No separate installation required.
 
 ---
 
 ### macOS (Homebrew) — Recommended
 
 ```bash
-brew tap M-Igashi/tap
-brew install headroom
+brew install M-Igashi/tap/headroom
 ```
 
-ffmpeg is installed automatically as a dependency. mp3rgain is built-in.
+ffmpeg is installed automatically as a dependency.
 
 ---
 
@@ -192,13 +189,11 @@ scoop bucket add headroom https://github.com/M-Igashi/scoop-bucket
 scoop install headroom
 ```
 
-ffmpeg is installed automatically as a dependency. mp3rgain is built-in.
+ffmpeg is installed automatically as a dependency.
 
 ---
 
 ### Windows (winget)
-
-> **Note:** winget package is pending approval. See [PR #329680](https://github.com/microsoft/winget-pkgs/pull/329680).
 
 ```powershell
 winget install M-Igashi.headroom
@@ -255,17 +250,13 @@ Download pre-built binaries from the [Releases](https://github.com/M-Igashi/head
 | Linux ARM64 | `headroom-vX.X.X-linux-aarch64.tar.gz` |
 | Windows x86_64 | `headroom-vX.X.X-windows-x86_64.zip` |
 
-**Note:** You must install ffmpeg separately (see platform-specific commands above). mp3rgain is built-in.
+**Note:** You must install ffmpeg separately (see platform-specific commands above).
 
 ---
 
 ### Build from Source
 
 ```bash
-# Install Rust (if not already installed)
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
-# Clone and build
 git clone https://github.com/M-Igashi/headroom.git
 cd headroom
 cargo build --release
@@ -334,7 +325,7 @@ The MP3 format stores a "global_gain" value as an 8-bit integer (0-255). When de
 - +1 to global_gain = `2^(1/4)` = **+1.5 dB**
 - -1 to global_gain = `2^(-1/4)` = **-1.5 dB**
 
-This is a fundamental limitation of the MP3 format, not a tool limitation. headroom uses the [mp3rgain](https://github.com/M-Igashi/mp3rgain) library (built-in) to directly manipulate this field in each MP3 frame's side information.
+This is a fundamental limitation of the MP3 format, not a tool limitation. headroom uses the built-in [mp3rgain](https://github.com/M-Igashi/mp3rgain) library to directly manipulate this field in each MP3 frame's side information.
 
 ### Why Bitrate-Aware Ceiling for Native MP3?
 
@@ -363,15 +354,9 @@ At 320kbps, the re-encode introduces quantization noise below -90dB—far below 
 | Method | Format | Precision | Quality Loss | External Deps | Use Case |
 |--------|--------|-----------|--------------|---------------|----------|
 | ffmpeg (lossless) | FLAC, AIFF, WAV | Arbitrary | None | ffmpeg | Lossless files |
-| mp3rgain (lossless) | MP3 | 1.5dB steps | **None** | mp3rgain | MP3 with ≥1.5dB to bitrate ceiling |
+| mp3rgain (built-in) | MP3 | 1.5dB steps | **None** | None | MP3 with ≥1.5dB to bitrate ceiling |
 | ffmpeg re-encode | MP3 | Arbitrary | Inaudible at ≥256kbps | ffmpeg | MP3 needing precise gain |
 | ffmpeg re-encode | AAC/M4A | Arbitrary | Inaudible at ≥256kbps | ffmpeg | AAC files (always) |
-
-## Contributing
-
-Found a bug or have a feature request? Please [open an issue](https://github.com/M-Igashi/headroom/issues)!
-
-If headroom has been useful for your DJ sets, consider ⭐ starring the repo — it really helps!
 
 ## License
 
