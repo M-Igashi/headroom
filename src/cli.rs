@@ -81,11 +81,9 @@ pub fn run() -> Result<()> {
     let has_reencode = summary.total_reencode() > 0;
 
     // First dialog: Lossless processing
-    if has_lossless {
-        if !prompt_lossless_processing(&summary)? {
-            println!("Done. No files were modified.");
-            return Ok(());
-        }
+    if has_lossless && !prompt_lossless_processing(&summary)? {
+        println!("Done. No files were modified.");
+        return Ok(());
     }
 
     // Second dialog: Re-encode processing (if applicable)
@@ -136,56 +134,27 @@ pub fn run() -> Result<()> {
     )?;
 
     // Final summary
-    let processed_lossless = files_to_process
-        .iter()
-        .filter(|a| matches!(a.gain_method, GainMethod::FfmpegLossless))
-        .count();
-    let processed_mp3_lossless = files_to_process
-        .iter()
-        .filter(|a| matches!(a.gain_method, GainMethod::Mp3Lossless))
-        .count();
-    let processed_mp3_reencode = files_to_process
-        .iter()
-        .filter(|a| matches!(a.gain_method, GainMethod::Mp3Reencode))
-        .count();
-    let processed_aac_reencode = files_to_process
-        .iter()
-        .filter(|a| matches!(a.gain_method, GainMethod::AacReencode))
-        .count();
-
     println!(
         "\n{} Done! {} files processed.",
         style("✓").green().bold(),
         files_to_process.len()
     );
 
-    if processed_lossless > 0 {
-        println!(
-            "  {} {} lossless files (ffmpeg)",
-            style("•").dim(),
-            processed_lossless
-        );
-    }
-    if processed_mp3_lossless > 0 {
-        println!(
-            "  {} {} MP3 files (native, lossless)",
-            style("•").dim(),
-            processed_mp3_lossless
-        );
-    }
-    if processed_mp3_reencode > 0 {
-        println!(
-            "  {} {} MP3 files (re-encoded)",
-            style("•").dim(),
-            processed_mp3_reencode
-        );
-    }
-    if processed_aac_reencode > 0 {
-        println!(
-            "  {} {} AAC/M4A files (re-encoded)",
-            style("•").dim(),
-            processed_aac_reencode
-        );
+    let summary_items: &[(GainMethod, &str)] = &[
+        (GainMethod::FfmpegLossless, "lossless files (ffmpeg)"),
+        (GainMethod::Mp3Lossless, "MP3 files (native, lossless)"),
+        (GainMethod::Mp3Reencode, "MP3 files (re-encoded)"),
+        (GainMethod::AacReencode, "AAC/M4A files (re-encoded)"),
+    ];
+
+    for (method, label) in summary_items {
+        let count = files_to_process
+            .iter()
+            .filter(|a| a.gain_method == *method)
+            .count();
+        if count > 0 {
+            println!("  {} {} {}", style("•").dim(), count, label);
+        }
     }
 
     Ok(())
@@ -252,7 +221,7 @@ fn print_banner() {
     );
     println!(
         "{}",
-        banner_style.apply_to("│          headroom v1.3.0            │")
+        banner_style.apply_to("│          headroom v1.4.0            │")
     );
     println!(
         "{}",

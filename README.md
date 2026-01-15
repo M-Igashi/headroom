@@ -103,7 +103,7 @@ $ cd ~/Music/DJ-Tracks
 $ headroom
 
 ╭─────────────────────────────────────╮
-│          headroom v1.3.0            │
+│          headroom v1.4.0            │
 │   Audio Loudness Analyzer & Gain    │
 ╰─────────────────────────────────────╯
 
@@ -168,7 +168,7 @@ $ headroom
 headroom requires one external tool:
 - **ffmpeg**: For audio analysis and lossless format processing
 
-> **Note:** As of v1.3.0, mp3rgain is built-in as a library dependency. No separate installation required.
+> **Note:** As of v1.3.0, mp3rgain is built-in as a library dependency. No separate installation required. v1.4.0 uses mp3rgain 1.3.0.
 
 ---
 

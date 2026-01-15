@@ -100,8 +100,7 @@ pub fn print_analysis_report(analyses: &[AudioAnalysis]) {
         .map(|a| a.filename.len())
         .max()
         .unwrap_or(8)
-        .max(8)
-        .min(40);
+        .clamp(8, 40);
 
     println!();
 

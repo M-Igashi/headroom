@@ -115,11 +115,9 @@ pub fn apply_gain_mp3_reencode(
     let temp_path = file_path.with_extension("tmp.mp3");
 
     // Determine target bitrate (preserve original or use 320k for high quality)
-    let bitrate = match bitrate_kbps {
-        Some(kbps) if kbps >= 256 => format!("{}k", kbps),
-        Some(kbps) => format!("{}k", kbps),
-        None => "320k".to_string(),
-    };
+    let bitrate = bitrate_kbps
+        .map(|kbps| format!("{}k", kbps))
+        .unwrap_or_else(|| "320k".to_string());
 
     let args = vec![
         "-y".to_string(),

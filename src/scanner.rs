@@ -40,24 +40,22 @@ pub fn get_supported_extensions() -> Vec<&'static str> {
     exts
 }
 
-pub fn is_mp3(path: &Path) -> bool {
+fn has_extension(path: &Path, extensions: &[&str]) -> bool {
     path.extension()
         .and_then(|ext| ext.to_str())
-        .map(|ext| MP3_EXTENSIONS.contains(&ext.to_lowercase().as_str()))
+        .map(|ext| extensions.contains(&ext.to_lowercase().as_str()))
         .unwrap_or(false)
+}
+
+pub fn is_mp3(path: &Path) -> bool {
+    has_extension(path, MP3_EXTENSIONS)
 }
 
 #[allow(dead_code)]
 pub fn is_lossless(path: &Path) -> bool {
-    path.extension()
-        .and_then(|ext| ext.to_str())
-        .map(|ext| LOSSLESS_EXTENSIONS.contains(&ext.to_lowercase().as_str()))
-        .unwrap_or(false)
+    has_extension(path, LOSSLESS_EXTENSIONS)
 }
 
 pub fn is_aac(path: &Path) -> bool {
-    path.extension()
-        .and_then(|ext| ext.to_str())
-        .map(|ext| AAC_EXTENSIONS.contains(&ext.to_lowercase().as_str()))
-        .unwrap_or(false)
+    has_extension(path, AAC_EXTENSIONS)
 }
