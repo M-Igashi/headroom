@@ -135,13 +135,11 @@ fn get_bitrate(path: &Path) -> Option<u32> {
         .map(|bps| bps / 1000) // Convert to kbps
 }
 
-fn get_target_true_peak(is_mp3: bool, is_aac: bool, bitrate_kbps: Option<u32>) -> f64 {
-    if !is_mp3 && !is_aac {
-        // Lossless files always use -0.5 dBTP
+fn get_target_true_peak(is_lossy: bool, bitrate_kbps: Option<u32>) -> f64 {
+    if !is_lossy {
         return TARGET_TRUE_PEAK_HIGH_QUALITY;
     }
 
-    // Lossy (MP3/AAC): check bitrate for re-encode target
     match bitrate_kbps {
         Some(kbps) if kbps >= HIGH_BITRATE_THRESHOLD => TARGET_TRUE_PEAK_HIGH_QUALITY,
         _ => TARGET_TRUE_PEAK_LOW_BITRATE,
@@ -195,20 +193,19 @@ pub fn analyze_file(path: &Path) -> Result<AudioAnalysis> {
         None
     };
 
-    // Determine target ceiling for re-encode (used for headroom display)
-    let target_tp = get_target_true_peak(is_mp3, is_aac, bitrate_kbps);
+    let is_lossy = is_mp3 || is_aac;
+    let target_tp = get_target_true_peak(is_lossy, bitrate_kbps);
     let headroom = target_tp - input_tp;
 
-    // Determine gain method and effective gain
     let (gain_method, effective_gain, mp3_gain_steps) = if is_aac {
-        // AAC file: always requires re-encode (no lossless gain mechanism)
+        // AAC: always requires re-encode
         if headroom >= MIN_EFFECTIVE_GAIN {
             (GainMethod::AacReencode, headroom, 0)
         } else {
             (GainMethod::None, 0.0, 0)
         }
-    } else if !is_mp3 {
-        // Lossless file: use ffmpeg if headroom > 0
+    } else if !is_lossy {
+        // Lossless: use ffmpeg
         if headroom >= MIN_EFFECTIVE_GAIN {
             (GainMethod::FfmpegLossless, headroom, 0)
         } else {

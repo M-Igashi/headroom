@@ -75,23 +75,17 @@ pub fn print_analysis_report(analyses: &[AudioAnalysis]) {
     let reencode_style = Style::new().magenta();
     let dim_style = Style::new().dim();
 
-    // Categorize files
-    let lossless_files: Vec<_> = analyses
-        .iter()
-        .filter(|a| matches!(a.gain_method, GainMethod::FfmpegLossless))
-        .collect();
-    let mp3_lossless_files: Vec<_> = analyses
-        .iter()
-        .filter(|a| matches!(a.gain_method, GainMethod::Mp3Lossless))
-        .collect();
-    let mp3_reencode_files: Vec<_> = analyses
-        .iter()
-        .filter(|a| matches!(a.gain_method, GainMethod::Mp3Reencode))
-        .collect();
-    let aac_reencode_files: Vec<_> = analyses
-        .iter()
-        .filter(|a| matches!(a.gain_method, GainMethod::AacReencode))
-        .collect();
+    let filter_by_method = |method: GainMethod| -> Vec<_> {
+        analyses
+            .iter()
+            .filter(|a| a.gain_method == method)
+            .collect()
+    };
+
+    let lossless_files = filter_by_method(GainMethod::FfmpegLossless);
+    let mp3_lossless_files = filter_by_method(GainMethod::Mp3Lossless);
+    let mp3_reencode_files = filter_by_method(GainMethod::Mp3Reencode);
+    let aac_reencode_files = filter_by_method(GainMethod::AacReencode);
 
     // Calculate column width (use character count, not byte count)
     let all_processable: Vec<_> = analyses.iter().filter(|a| a.has_headroom()).collect();
@@ -211,23 +205,14 @@ pub struct AnalysisSummary {
 
 impl AnalysisSummary {
     pub fn from_analyses(analyses: &[AudioAnalysis]) -> Self {
+        let count =
+            |method: GainMethod| analyses.iter().filter(|a| a.gain_method == method).count();
+
         Self {
-            lossless_count: analyses
-                .iter()
-                .filter(|a| matches!(a.gain_method, GainMethod::FfmpegLossless))
-                .count(),
-            mp3_lossless_count: analyses
-                .iter()
-                .filter(|a| matches!(a.gain_method, GainMethod::Mp3Lossless))
-                .count(),
-            mp3_reencode_count: analyses
-                .iter()
-                .filter(|a| matches!(a.gain_method, GainMethod::Mp3Reencode))
-                .count(),
-            aac_reencode_count: analyses
-                .iter()
-                .filter(|a| matches!(a.gain_method, GainMethod::AacReencode))
-                .count(),
+            lossless_count: count(GainMethod::FfmpegLossless),
+            mp3_lossless_count: count(GainMethod::Mp3Lossless),
+            mp3_reencode_count: count(GainMethod::Mp3Reencode),
+            aac_reencode_count: count(GainMethod::AacReencode),
         }
     }
 

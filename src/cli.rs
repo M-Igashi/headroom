@@ -140,17 +140,15 @@ pub fn run() -> Result<()> {
         files_to_process.len()
     );
 
-    let summary_items: &[(GainMethod, &str)] = &[
+    for (method, label) in [
         (GainMethod::FfmpegLossless, "lossless files (ffmpeg)"),
         (GainMethod::Mp3Lossless, "MP3 files (native, lossless)"),
         (GainMethod::Mp3Reencode, "MP3 files (re-encoded)"),
         (GainMethod::AacReencode, "AAC/M4A files (re-encoded)"),
-    ];
-
-    for (method, label) in summary_items {
+    ] {
         let count = files_to_process
             .iter()
-            .filter(|a| a.gain_method == *method)
+            .filter(|a| a.gain_method == method)
             .count();
         if count > 0 {
             println!("  {} {} {}", style("•").dim(), count, label);
@@ -221,7 +219,7 @@ fn print_banner() {
     );
     println!(
         "{}",
-        banner_style.apply_to("│          headroom v1.4.0            │")
+        banner_style.apply_to("│          headroom v1.4.1            │")
     );
     println!(
         "{}",
