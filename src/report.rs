@@ -93,11 +93,11 @@ pub fn print_analysis_report(analyses: &[AudioAnalysis]) {
         .filter(|a| matches!(a.gain_method, GainMethod::AacReencode))
         .collect();
 
-    // Calculate column width
+    // Calculate column width (use character count, not byte count)
     let all_processable: Vec<_> = analyses.iter().filter(|a| a.has_headroom()).collect();
     let filename_width = all_processable
         .iter()
-        .map(|a| a.filename.len())
+        .map(|a| a.filename.chars().count())
         .max()
         .unwrap_or(8)
         .clamp(8, 40);
@@ -177,8 +177,11 @@ fn print_file_table(files: &[&AudioAnalysis], filename_width: usize, accent_styl
 
     // Print rows
     for analysis in files {
-        let display_name: String = if analysis.filename.len() > filename_width {
-            format!("{}…", &analysis.filename[..filename_width - 1])
+        // Use character count instead of byte count to handle multi-byte UTF-8 characters
+        let char_count = analysis.filename.chars().count();
+        let display_name: String = if char_count > filename_width {
+            let truncated: String = analysis.filename.chars().take(filename_width - 1).collect();
+            format!("{}…", truncated)
         } else {
             analysis.filename.clone()
         };
