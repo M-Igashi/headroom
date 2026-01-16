@@ -132,8 +132,6 @@ pub fn apply_gain_mp3_reencode(
         "libmp3lame".to_string(),
         "-b:a".to_string(),
         bitrate,
-        "-q:a".to_string(),
-        "0".to_string(), // Highest quality VBR
         temp_path
             .to_str()
             .ok_or_else(|| anyhow!("Invalid temp path"))?
