@@ -1,6 +1,6 @@
 [package]
 name = "headroom"
-version = "1.4.2"
+version = "1.4.3"
 edition = "2021"
 authors = ["Masanari Higashi"]
 description = "Audio loudness analyzer and gain adjustment tool for mastering workflows"
