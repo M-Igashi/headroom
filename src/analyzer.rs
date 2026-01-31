@@ -149,8 +149,11 @@ fn get_target_true_peak(is_lossy: bool, bitrate_kbps: Option<u32>) -> f64 {
 pub fn analyze_file(path: &Path) -> Result<AudioAnalysis> {
     let output = Command::new("ffmpeg")
         .args([
+            "-nostdin",
             "-i",
             path.to_str().ok_or_else(|| anyhow!("Invalid path"))?,
+            "-map",
+            "0:a:0",
             "-af",
             "loudnorm=print_format=json",
             "-f",
@@ -163,9 +166,14 @@ pub fn analyze_file(path: &Path) -> Result<AudioAnalysis> {
     let stderr = String::from_utf8_lossy(&output.stderr);
 
     // Extract JSON from ffmpeg output
-    let json_start = stderr
-        .find('{')
-        .ok_or_else(|| anyhow!("No JSON found in ffmpeg output"))?;
+    let json_start = stderr.find('{').ok_or_else(|| {
+        anyhow!(
+            "No JSON found in ffmpeg output. \
+             This may be caused by problematic ID3v2 metadata (GEOB/PRIV frames from DJ software). \
+             Try removing these frames with: eyeD3 --remove-all-objects \"{}\"",
+            path.display()
+        )
+    })?;
     let json_end = stderr
         .rfind('}')
         .ok_or_else(|| anyhow!("Invalid JSON in ffmpeg output"))?;
