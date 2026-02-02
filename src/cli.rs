@@ -212,15 +212,24 @@ fn prompt_reencode_processing(summary: &AnalysisSummary) -> Result<bool> {
 
 fn print_banner() {
     let banner_style = Style::new().cyan().bold();
+    let version = env!("CARGO_PKG_VERSION");
+    let title = format!("headroom v{}", version);
+    let padding = (37 - title.len() - 2) / 2;
+    let title_line = format!(
+        "│{:padding$}{}{:padding$}│",
+        "",
+        title,
+        "",
+        padding = padding
+    );
+    // Ensure exactly 39 chars wide
+    let title_line = format!("{:<39}", title_line);
     println!();
     println!(
         "{}",
         banner_style.apply_to("╭─────────────────────────────────────╮")
     );
-    println!(
-        "{}",
-        banner_style.apply_to("│          headroom v1.4.3            │")
-    );
+    println!("{}", banner_style.apply_to(&title_line));
     println!(
         "{}",
         banner_style.apply_to("│   Audio Loudness Analyzer & Gain    │")
