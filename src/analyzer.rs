@@ -146,6 +146,59 @@ fn get_target_true_peak(is_lossy: bool, bitrate_kbps: Option<u32>) -> f64 {
     }
 }
 
+/// Extract loudnorm JSON from ffmpeg stderr output.
+/// The loudnorm filter outputs JSON after "[Parsed_loudnorm_0 @" marker.
+/// This is more reliable than searching for the first '{' which may match
+/// binary data in GEOB/PRIV ID3v2 frames.
+fn extract_loudnorm_json(stderr: &str, path: &Path) -> Result<LoudnormOutput> {
+    // Look for the loudnorm marker that precedes the JSON output
+    let marker = "[Parsed_loudnorm_0 @";
+
+    if let Some(marker_pos) = stderr.find(marker) {
+        // Find the JSON block after the marker
+        let after_marker = &stderr[marker_pos..];
+        if let Some(json_start) = after_marker.find('{') {
+            let json_section = &after_marker[json_start..];
+            if let Some(json_end) = json_section.find('}') {
+                let json_str = &json_section[..=json_end];
+                return serde_json::from_str(json_str).with_context(|| {
+                    format!(
+                        "Failed to parse loudnorm JSON. Run: ffmpeg -nostdin -i \"{}\" -map 0:a:0 -af loudnorm=print_format=json -f null - 2>&1 | tail -20",
+                        path.display()
+                    )
+                });
+            }
+        }
+    }
+
+    // Fallback: try to find any valid loudnorm JSON (for older ffmpeg versions)
+    // Search for JSON blocks and try to parse them as LoudnormOutput
+    let mut search_pos = 0;
+    while let Some(json_start) = stderr[search_pos..].find('{') {
+        let abs_start = search_pos + json_start;
+        if let Some(json_end) = stderr[abs_start..].find('}') {
+            let json_str = &stderr[abs_start..abs_start + json_end + 1];
+            if let Ok(loudnorm) = serde_json::from_str::<LoudnormOutput>(json_str) {
+                return Ok(loudnorm);
+            }
+        }
+        search_pos = abs_start + 1;
+    }
+
+    // No valid loudnorm JSON found
+    Err(anyhow!(
+        "No loudnorm data found in ffmpeg output. \
+         This may be caused by:\n\
+         1. Problematic ID3v2 metadata (GEOB/PRIV frames from DJ software)\n\
+         2. Corrupted or unsupported audio file\n\
+         3. Very old ffmpeg version\n\n\
+         Try: ffmpeg -nostdin -i \"{}\" -map 0:a:0 -af loudnorm=print_format=json -f null - 2>&1 | tail -30\n\
+         Or remove DJ metadata: eyeD3 --remove-all-objects \"{}\"",
+        path.display(),
+        path.display()
+    ))
+}
+
 pub fn analyze_file(path: &Path) -> Result<AudioAnalysis> {
     let output = Command::new("ffmpeg")
         .args([
@@ -165,22 +218,9 @@ pub fn analyze_file(path: &Path) -> Result<AudioAnalysis> {
 
     let stderr = String::from_utf8_lossy(&output.stderr);
 
-    // Extract JSON from ffmpeg output
-    let json_start = stderr.find('{').ok_or_else(|| {
-        anyhow!(
-            "No JSON found in ffmpeg output. \
-             This may be caused by problematic ID3v2 metadata (GEOB/PRIV frames from DJ software). \
-             Try removing these frames with: eyeD3 --remove-all-objects \"{}\"",
-            path.display()
-        )
-    })?;
-    let json_end = stderr
-        .rfind('}')
-        .ok_or_else(|| anyhow!("Invalid JSON in ffmpeg output"))?;
-
-    let json_str = &stderr[json_start..=json_end];
-    let loudnorm: LoudnormOutput =
-        serde_json::from_str(json_str).context("Failed to parse loudnorm JSON")?;
+    // Extract loudnorm JSON from ffmpeg output
+    // The loudnorm filter outputs JSON after "[Parsed_loudnorm_0 @" marker
+    let loudnorm: LoudnormOutput = extract_loudnorm_json(&stderr, path)?;
 
     let input_i: f64 = loudnorm
         .input_i
