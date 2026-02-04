@@ -159,8 +159,25 @@ fn extract_loudnorm_json(stderr: &str, path: &Path) -> Result<LoudnormOutput> {
         let after_marker = &stderr[marker_pos..];
         if let Some(json_start) = after_marker.find('{') {
             let json_section = &after_marker[json_start..];
-            if let Some(json_end) = json_section.find('}') {
-                let json_str = &json_section[..=json_end];
+            // Find the matching closing brace by counting braces
+            // The loudnorm JSON is a simple flat object, but we handle nesting just in case
+            let mut depth = 0;
+            let mut json_end = None;
+            for (i, ch) in json_section.char_indices() {
+                match ch {
+                    '{' => depth += 1,
+                    '}' => {
+                        depth -= 1;
+                        if depth == 0 {
+                            json_end = Some(i);
+                            break;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            if let Some(end) = json_end {
+                let json_str = &json_section[..=end];
                 return serde_json::from_str(json_str).with_context(|| {
                     format!(
                         "Failed to parse loudnorm JSON. Run: ffmpeg -nostdin -i \"{}\" -map 0:a:0 -af loudnorm=print_format=json -f null - 2>&1 | tail -20",
@@ -172,17 +189,35 @@ fn extract_loudnorm_json(stderr: &str, path: &Path) -> Result<LoudnormOutput> {
     }
 
     // Fallback: try to find any valid loudnorm JSON (for older ffmpeg versions)
-    // Search for JSON blocks and try to parse them as LoudnormOutput
-    let mut search_pos = 0;
-    while let Some(json_start) = stderr[search_pos..].find('{') {
-        let abs_start = search_pos + json_start;
-        if let Some(json_end) = stderr[abs_start..].find('}') {
-            let json_str = &stderr[abs_start..abs_start + json_end + 1];
-            if let Ok(loudnorm) = serde_json::from_str::<LoudnormOutput>(json_str) {
-                return Ok(loudnorm);
+    // Search backwards from the end of output for JSON blocks containing "input_i"
+    // This avoids matching binary data in GEOB/PRIV frames that may contain '{' characters
+    if let Some(input_i_pos) = stderr.rfind("\"input_i\"") {
+        // Find the opening brace before "input_i"
+        if let Some(json_start) = stderr[..input_i_pos].rfind('{') {
+            let json_section = &stderr[json_start..];
+            // Find the matching closing brace
+            let mut depth = 0;
+            let mut json_end = None;
+            for (i, ch) in json_section.char_indices() {
+                match ch {
+                    '{' => depth += 1,
+                    '}' => {
+                        depth -= 1;
+                        if depth == 0 {
+                            json_end = Some(i);
+                            break;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            if let Some(end) = json_end {
+                let json_str = &json_section[..=end];
+                if let Ok(loudnorm) = serde_json::from_str::<LoudnormOutput>(json_str) {
+                    return Ok(loudnorm);
+                }
             }
         }
-        search_pos = abs_start + 1;
     }
 
     // No valid loudnorm JSON found
@@ -310,4 +345,94 @@ pub fn check_ffmpeg() -> Result<()> {
         .output()
         .context("ffmpeg not found. Please install ffmpeg first.")?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    /// Test JSON extraction with GEOB/PRIV frames containing '{' and '}' characters
+    /// This reproduces the issue reported in GitHub issue #10
+    #[test]
+    fn test_extract_loudnorm_json_with_traktor_metadata() {
+        let stderr = r#"        encoder         : LAME3.100
+        id3v2_priv.TRAKTOR4: DMRT\xf4{\x00\x00\x02\x00\x00\x00RDH 0\x00\x00\x00\x03\x00\x00\x00SKHC\x04\x00\x00\x00\x00\x00\x00\x00i?"\x00DOMF\x04\x00\x00\x00\x00\x00\x00\x00\x14\x0a\xe8\x07NSRV\x04\x00\x00\x00\x00\x00\x00\x00\x07\x00\x00\x00ATAD\xac{\x00\x00\x17\x00\x00\x00BDNA\x04\
+        encoder         : Lavf62.3.100
+    [Parsed_loudnorm_0 @ 0xc8f448a80] N/A speed=30.3x elapsed=0:00:10.57
+    {
+    	"input_i" : "-6.83",
+    	"input_tp" : "2.55",
+    	"input_lra" : "4.40",
+    	"input_thresh" : "-16.87",
+    	"output_i" : "-23.34",
+    	"output_tp" : "-11.73",
+    	"output_lra" : "4.30",
+    	"output_thresh" : "-33.37",
+    	"normalization_type" : "dynamic",
+    	"target_offset" : "-0.66"
+    }
+    [out#0/null @ 0xc8f448300] video:0KiB audio:244683KiB"#;
+
+        let path = PathBuf::from("/test/Habstrakt - Eat Me.mp3");
+        let result = extract_loudnorm_json(stderr, &path);
+
+        assert!(result.is_ok(), "Should successfully parse loudnorm JSON");
+        let loudnorm = result.unwrap();
+        assert_eq!(loudnorm.input_i, "-6.83");
+        assert_eq!(loudnorm.input_tp, "2.55");
+    }
+
+    /// Test JSON extraction with standard output (no problematic metadata)
+    #[test]
+    fn test_extract_loudnorm_json_standard() {
+        let stderr = r#"    [Parsed_loudnorm_0 @ 0x12345678]
+    {
+    	"input_i" : "-14.00",
+    	"input_tp" : "-1.00",
+    	"input_lra" : "5.00",
+    	"input_thresh" : "-24.00",
+    	"output_i" : "-24.00",
+    	"output_tp" : "-2.00",
+    	"output_lra" : "5.00",
+    	"output_thresh" : "-34.00",
+    	"normalization_type" : "dynamic",
+    	"target_offset" : "0.00"
+    }"#;
+
+        let path = PathBuf::from("/test/normal.mp3");
+        let result = extract_loudnorm_json(stderr, &path);
+
+        assert!(result.is_ok());
+        let loudnorm = result.unwrap();
+        assert_eq!(loudnorm.input_i, "-14.00");
+        assert_eq!(loudnorm.input_tp, "-1.00");
+    }
+
+    /// Test fallback when marker is not present (older ffmpeg versions)
+    #[test]
+    fn test_extract_loudnorm_json_fallback() {
+        let stderr = r#"Some other output
+    {
+    	"input_i" : "-10.00",
+    	"input_tp" : "0.50",
+    	"input_lra" : "3.00",
+    	"input_thresh" : "-20.00",
+    	"output_i" : "-23.00",
+    	"output_tp" : "-10.00",
+    	"output_lra" : "3.00",
+    	"output_thresh" : "-33.00",
+    	"normalization_type" : "dynamic",
+    	"target_offset" : "-1.00"
+    }
+    More output"#;
+
+        let path = PathBuf::from("/test/old_ffmpeg.mp3");
+        let result = extract_loudnorm_json(stderr, &path);
+
+        assert!(result.is_ok());
+        let loudnorm = result.unwrap();
+        assert_eq!(loudnorm.input_i, "-10.00");
+        assert_eq!(loudnorm.input_tp, "0.50");
+    }
 }
