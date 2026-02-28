@@ -114,6 +114,7 @@ pub fn run() -> Result<()> {
         .filter(|a| match a.gain_method {
             GainMethod::FfmpegLossless => true,
             GainMethod::Mp3Lossless => true,
+            GainMethod::AacLossless => true,
             GainMethod::Mp3Reencode => allow_reencode,
             GainMethod::AacReencode => allow_reencode,
             GainMethod::None => false,
@@ -143,6 +144,7 @@ pub fn run() -> Result<()> {
     for (method, label) in [
         (GainMethod::FfmpegLossless, "lossless files (ffmpeg)"),
         (GainMethod::Mp3Lossless, "MP3 files (native, lossless)"),
+        (GainMethod::AacLossless, "AAC/M4A files (native, lossless)"),
         (GainMethod::Mp3Reencode, "MP3 files (re-encoded)"),
         (GainMethod::AacReencode, "AAC/M4A files (re-encoded)"),
     ] {
@@ -168,6 +170,12 @@ fn prompt_lossless_processing(summary: &AnalysisSummary) -> Result<bool> {
         prompt_parts.push(format!(
             "{} MP3 (lossless gain)",
             summary.mp3_lossless_count
+        ));
+    }
+    if summary.aac_lossless_count > 0 {
+        prompt_parts.push(format!(
+            "{} AAC/M4A (lossless gain)",
+            summary.aac_lossless_count
         ));
     }
 

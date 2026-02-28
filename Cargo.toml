@@ -33,7 +33,7 @@ chrono = "0.4"
 shellexpand = "3.1"
 
 # MP3 lossless gain adjustment
-mp3rgain = "1.6"
+mp3rgain = { path = "../mp3rgain", default-features = false, features = ["aac"] }
 
 [profile.release]
 lto = "thin"

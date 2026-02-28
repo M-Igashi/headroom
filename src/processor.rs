@@ -106,6 +106,18 @@ pub fn apply_gain_mp3_native(file_path: &Path, gain_steps: i32) -> Result<()> {
     Ok(())
 }
 
+/// Apply gain to AAC/M4A files using mp3rgain library (lossless, 1.5dB steps)
+pub fn apply_gain_aac_native(file_path: &Path, gain_steps: i32) -> Result<()> {
+    if gain_steps == 0 {
+        return Ok(());
+    }
+
+    mp3rgain::aac::apply_aac_gain(file_path, gain_steps)
+        .context("mp3rgain failed to apply AAC gain")?;
+
+    Ok(())
+}
+
 /// Apply gain to MP3 files by re-encoding (lossy, but precise control)
 pub fn apply_gain_mp3_reencode(
     file_path: &Path,
@@ -248,6 +260,7 @@ pub fn process_file(
     let apply_result = match analysis.gain_method {
         GainMethod::FfmpegLossless => apply_gain_ffmpeg(file_path, analysis.effective_gain),
         GainMethod::Mp3Lossless => apply_gain_mp3_native(file_path, analysis.mp3_gain_steps),
+        GainMethod::AacLossless => apply_gain_aac_native(file_path, analysis.aac_gain_steps),
         GainMethod::Mp3Reencode => {
             apply_gain_mp3_reencode(file_path, analysis.effective_gain, analysis.bitrate_kbps)
         }
