@@ -131,18 +131,22 @@ $ headroom
 
 ## Installation
 
-### Package Managers (Recommended)
+### macOS (Homebrew)
+
+```bash
+brew install M-Igashi/tap/headroom
+```
 
 ffmpeg is installed automatically as a dependency.
 
-```bash
-# macOS (Homebrew)
-brew install M-Igashi/tap/headroom
+### Windows
 
-# Windows (winget)
+```powershell
+# winget
 winget install M-Igashi.headroom
+winget install ffmpeg  # required separately
 
-# Windows (Scoop)
+# Scoop (ffmpeg is installed automatically)
 scoop bucket add headroom https://github.com/M-Igashi/scoop-bucket
 scoop install headroom
 ```
