@@ -18,84 +18,41 @@ This tool is designed for DJs and producers who want to maximize loudness while 
 - **No limiter**: Pure gain adjustment only — dynamics are preserved
 - **Interactive CLI**: Guided step-by-step process with two-stage confirmation
 
-## Supported Formats & Processing Methods
+## Processing Methods
 
-| Format | Extension | Method | Precision | Notes |
-|--------|-----------|--------|-----------|-------|
-| FLAC | .flac | ffmpeg | Arbitrary | Lossless re-encode |
-| AIFF | .aiff, .aif | ffmpeg | Arbitrary | Lossless re-encode |
-| WAV | .wav | ffmpeg | Arbitrary | Lossless re-encode |
-| MP3 | .mp3 | mp3rgain (built-in) | 1.5dB steps | Truly lossless (global_gain modification) |
-| MP3 | .mp3 | ffmpeg re-encode | Arbitrary | For files needing precise gain |
-| AAC/M4A | .m4a, .aac, .mp4 | mp3rgain (built-in) | 1.5dB steps | Truly lossless (global_gain modification) |
-| AAC/M4A | .m4a, .aac, .mp4 | ffmpeg re-encode | Arbitrary | For files needing precise gain |
+headroom selects the optimal method for each file based on format and headroom:
 
-## MP3 Processing: Three-Tier Approach
+| Format | Method | Precision | Quality Loss |
+|--------|--------|-----------|--------------|
+| FLAC, AIFF, WAV | ffmpeg | Arbitrary | None |
+| MP3, AAC/M4A | mp3rgain (built-in) | 1.5dB steps | **None** (global_gain modification) |
+| MP3, AAC/M4A | ffmpeg re-encode | Arbitrary | Inaudible at ≥256kbps |
 
-headroom intelligently chooses the best method for each MP3 file:
+### Three-Tier Approach for Lossy Formats (MP3/AAC)
 
-### 1. Native Lossless (Built-in mp3rgain, bitrate-aware ceiling)
-For MP3 files with ≥1.5 dB headroom to bitrate-aware ceiling:
-- Truly lossless global_gain header modification
-- 1.5 dB step increments (MP3 format specification)
-- Uses built-in [mp3rgain](https://github.com/M-Igashi/mp3rgain) library
-- ≥256kbps: -0.5 dBTP ceiling (requires TP ≤ -2.0 dBTP)
-- <256kbps: -1.0 dBTP ceiling (requires TP ≤ -2.5 dBTP)
+Each MP3 and AAC/M4A file is categorized into one of three tiers:
 
-### 2. Re-encode (Precise, bitrate-aware ceiling)
-For MP3 files with headroom but <1.5 dB to ceiling:
-- Uses ffmpeg for arbitrary precision gain
-- Preserves original bitrate
-- Requires explicit user confirmation
+1. **Native Lossless** — ≥1.5 dB headroom to bitrate-aware ceiling
+   - Truly lossless global_gain header modification in 1.5dB steps
+   - Uses built-in [mp3rgain](https://github.com/M-Igashi/mp3rgain) library
+   - Applied automatically (no user confirmation needed)
 
-### 3. Skip (No headroom)
-Files already at or above the target ceiling are not processed.
+2. **Re-encode** — headroom exists but <1.5 dB to ceiling
+   - Uses ffmpeg for arbitrary precision gain
+   - MP3: `libmp3lame` with `-q:a 0` / AAC: `libfdk_aac` (falls back to built-in `aac`)
+   - Preserves original bitrate; requires explicit user confirmation
 
-## AAC/M4A Processing: Three-Tier Approach
+3. **Skip** — no headroom available
 
-As of v1.7.0, AAC/M4A files follow the same three-tier approach as MP3:
+## True Peak Ceiling
 
-### 1. Native Lossless (Built-in mp3rgain 2.0, bitrate-aware ceiling)
-For AAC/M4A files with ≥1.5 dB headroom to bitrate-aware ceiling:
-- Truly lossless global_gain header modification
-- 1.5 dB step increments
-- Uses built-in [mp3rgain](https://github.com/M-Igashi/mp3rgain) library v2.0
-- ≥256kbps: -0.5 dBTP ceiling (requires TP ≤ -2.0 dBTP)
-- <256kbps: -1.0 dBTP ceiling (requires TP ≤ -2.5 dBTP)
+Based on [AES TD1008](https://www.aes.org/technical/documentDownloads.cfm?docID=731) recommendations. The ceiling depends on bitrate, not format:
 
-### 2. Re-encode (Precise, bitrate-aware ceiling)
-For AAC/M4A files with headroom but <1.5 dB to ceiling:
-- Uses ffmpeg for arbitrary precision gain
-- Prefers libfdk_aac when available, falls back to built-in aac encoder
-- Preserves original bitrate
-- Requires explicit user confirmation
-
-### 3. Skip (No headroom)
-Files already at or above the target ceiling are not processed.
-
-### Why Re-encode AAC is Safe at High Bitrates
-
-Same principles apply as MP3 re-encoding:
-- At ≥256kbps, quantization noise stays below -90dB (inaudible)
-- Only gain is applied (no EQ, compression, or dynamics processing)
-- Original bitrate is preserved
-- Requires explicit user opt-in
-
-## True Peak Ceiling Strategy
-
-Based on [AES TD1008](https://www.aes.org/technical/documentDownloads.cfm?docID=731) recommendations:
-
-| Format | Method | Ceiling | Rationale |
-|--------|--------|---------|-----------|
-| Lossless (FLAC, AIFF, WAV) | ffmpeg | **-0.5 dBTP** | Will be distributed via high-bitrate streaming |
-| MP3 ≥256kbps (lossless) | mp3rgain | **-0.5 dBTP** | Requires TP ≤ -2.0 dBTP for 1.5dB steps |
-| MP3 <256kbps (lossless) | mp3rgain | **-1.0 dBTP** | Requires TP ≤ -2.5 dBTP for 1.5dB steps |
-| MP3 ≥256kbps (re-encode) | ffmpeg | **-0.5 dBTP** | High-bitrate codecs have minimal overshoot |
-| MP3 <256kbps (re-encode) | ffmpeg | **-1.0 dBTP** | Lower bitrates cause more codec overshoot |
-| AAC ≥256kbps (lossless) | mp3rgain | **-0.5 dBTP** | Requires TP ≤ -2.0 dBTP for 1.5dB steps |
-| AAC <256kbps (lossless) | mp3rgain | **-1.0 dBTP** | Requires TP ≤ -2.5 dBTP for 1.5dB steps |
-| AAC ≥256kbps (re-encode) | ffmpeg | **-0.5 dBTP** | High-bitrate AAC has minimal overshoot |
-| AAC <256kbps (re-encode) | ffmpeg | **-1.0 dBTP** | Lower bitrates cause more codec overshoot |
+| Bitrate | Ceiling | Native lossless requires |
+|---------|---------|------------------------|
+| Lossless (FLAC, AIFF, WAV) | **-0.5 dBTP** | — |
+| Lossy ≥256kbps | **-0.5 dBTP** | TP ≤ -2.0 dBTP |
+| Lossy <256kbps | **-1.0 dBTP** | TP ≤ -2.5 dBTP |
 
 ## How It Works
 
@@ -174,64 +131,29 @@ $ headroom
 
 ## Installation
 
-### Quick Install
+### Package Managers (Recommended)
 
-| Platform | Command |
-|----------|---------|
-| **macOS** | `brew install M-Igashi/tap/headroom` |
-| **Windows** | `winget install M-Igashi.headroom` |
-| **Windows (Scoop)** | `scoop bucket add headroom https://github.com/M-Igashi/scoop-bucket && scoop install headroom` |
-| **All platforms** | `cargo install headroom` + install ffmpeg |
-
-### Prerequisites
-
-headroom requires one external tool:
-- **ffmpeg**: For audio analysis and lossless format processing
-
-> **Note:** As of v1.3.0, mp3rgain is built-in as a library dependency. No separate installation required.
-
----
-
-### macOS (Homebrew) — Recommended
+ffmpeg is installed automatically as a dependency.
 
 ```bash
+# macOS (Homebrew)
 brew install M-Igashi/tap/headroom
-```
 
-ffmpeg is installed automatically as a dependency.
-
----
-
-### Windows (winget) — Recommended
-
-```powershell
+# Windows (winget)
 winget install M-Igashi.headroom
-```
 
-ffmpeg is installed automatically as a dependency.
-
----
-
-### Windows (Scoop)
-
-```powershell
+# Windows (Scoop)
 scoop bucket add headroom https://github.com/M-Igashi/scoop-bucket
 scoop install headroom
 ```
 
-ffmpeg is installed automatically as a dependency.
-
----
-
-### Cargo (All Platforms)
-
-If you have Rust installed, you can install headroom via cargo:
+### Cargo
 
 ```bash
 cargo install headroom
 ```
 
-Then install ffmpeg for your platform:
+ffmpeg must be installed separately:
 
 ```bash
 # macOS
@@ -246,18 +168,13 @@ sudo dnf install ffmpeg
 # Arch
 sudo pacman -S ffmpeg
 
-# Windows (winget)
+# Windows
 winget install ffmpeg
-
-# Windows (choco)
-choco install ffmpeg
 ```
-
----
 
 ### Pre-built Binaries
 
-Download pre-built binaries from the [Releases](https://github.com/M-Igashi/headroom/releases) page:
+Download from the [Releases](https://github.com/M-Igashi/headroom/releases) page. ffmpeg must be installed separately.
 
 | Platform | File |
 |----------|------|
@@ -266,20 +183,12 @@ Download pre-built binaries from the [Releases](https://github.com/M-Igashi/head
 | Linux ARM64 | `headroom-vX.X.X-linux-aarch64.tar.gz` |
 | Windows x86_64 | `headroom-vX.X.X-windows-x86_64.zip` |
 
-**Note:** You must install ffmpeg separately (see platform-specific commands above).
-
----
-
 ### Build from Source
 
 ```bash
 git clone https://github.com/M-Igashi/headroom.git
 cd headroom
 cargo build --release
-
-# Binary location:
-# - Unix: target/release/headroom
-# - Windows: target\release\headroom.exe
 ```
 
 ## Usage
@@ -329,52 +238,29 @@ The tool will guide you through:
 
 - **Files are overwritten in place** after backup — Rekordbox metadata remains linked
 - Only files with **positive effective gain** are shown and processed
-- MP3/AAC native lossless requires at least **1.5dB headroom to -2.0 dBTP** to be processed
+- MP3/AAC native lossless requires at least **1.5dB headroom** to be processed
 - MP3/AAC re-encoding is **opt-in** and requires explicit confirmation
 - macOS resource fork files (`._*`) are automatically ignored
 
 ## Technical Details
 
-### Why 1.5dB Steps for Native MP3 Gain?
+### Why 1.5dB Steps?
 
-The MP3 format stores a "global_gain" value as an 8-bit integer (0-255). When decoding, samples are multiplied by `2^(gain/4)`:
+Both MP3 and AAC store a "global_gain" value as an integer. Each ±1 increment changes the gain by `2^(1/4)` = **±1.5 dB**. This is a format-level constraint, not a tool limitation.
 
-- +1 to global_gain = `2^(1/4)` = **+1.5 dB**
-- -1 to global_gain = `2^(-1/4)` = **-1.5 dB**
+headroom uses the built-in [mp3rgain](https://github.com/M-Igashi/mp3rgain) library to directly modify this field — no decoding or re-encoding involved.
 
-This is a fundamental limitation of the MP3 format, not a tool limitation. headroom uses the built-in [mp3rgain](https://github.com/M-Igashi/mp3rgain) library to directly manipulate this field in each MP3 frame's side information.
+### Bitrate-Aware Ceiling for Native Lossless
 
-### Why Bitrate-Aware Ceiling for Native MP3?
+Since native lossless gain only works in 1.5dB steps, at least 1.5dB of headroom to the target ceiling is required:
+- **≥256kbps**: Target -0.5 dBTP → requires TP ≤ -2.0 dBTP
+- **<256kbps**: Target -1.0 dBTP → requires TP ≤ -2.5 dBTP
 
-With 1.5dB step limitation, the ceiling is calculated based on bitrate to match re-encode targets:
-- **≥256kbps**: Target -0.5 dBTP, so native lossless requires TP ≤ -2.0 dBTP (allowing at least 1 step)
-- **<256kbps**: Target -1.0 dBTP, so native lossless requires TP ≤ -2.5 dBTP (more conservative)
-- Example: 320kbps file at -3.5 dBTP gets 2 steps (+3.0dB) → -0.5 dBTP (optimal)
-- Example: 128kbps file at -3.5 dBTP gets 1 step (+1.5dB) → -2.0 dBTP (within -1.0 ceiling)
+Example: 320kbps file at -3.5 dBTP gets 2 steps (+3.0dB) → -0.5 dBTP (optimal)
 
-### AAC Lossless Gain (v1.7.0+)
+### Re-encode Quality
 
-As of v1.7.0, headroom uses [mp3rgain](https://github.com/M-Igashi/mp3rgain) v2.0 to apply lossless gain to AAC/M4A files. This works the same way as MP3: modifying the global_gain field in 1.5dB steps without re-encoding. Files with less than 1.5dB headroom to the bitrate-aware ceiling fall back to ffmpeg re-encode.
-
-### MP3/AAC Re-encode Quality
-
-When re-encoding is chosen:
-- **MP3**: Uses `libmp3lame` encoder with `-q:a 0` (best VBR quality)
-- **AAC**: Prefers `libfdk_aac` (highest quality), falls back to built-in `aac` encoder
-- Preserves original bitrate
-- Only applies volume filter (no other processing)
-
-At 320kbps, the re-encode introduces quantization noise below -90dB—far below audible threshold.
-
-### Processing Method Comparison
-
-| Method | Format | Precision | Quality Loss | External Deps | Use Case |
-|--------|--------|-----------|--------------|---------------|----------|
-| ffmpeg (lossless) | FLAC, AIFF, WAV | Arbitrary | None | ffmpeg | Lossless files |
-| mp3rgain (built-in) | MP3 | 1.5dB steps | **None** | None | MP3 with ≥1.5dB to bitrate ceiling |
-| ffmpeg re-encode | MP3 | Arbitrary | Inaudible at ≥256kbps | ffmpeg | MP3 needing precise gain |
-| mp3rgain (built-in) | AAC/M4A | 1.5dB steps | **None** | None | AAC with ≥1.5dB to bitrate ceiling |
-| ffmpeg re-encode | AAC/M4A | Arbitrary | Inaudible at ≥256kbps | ffmpeg | AAC needing precise gain |
+At ≥256kbps, re-encoding introduces quantization noise below -90dB — far below audible threshold. Only gain is applied (no EQ, compression, or dynamics processing), and original bitrate is preserved.
 
 ## License
 
