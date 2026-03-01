@@ -131,61 +131,16 @@ $ headroom
 
 ## Installation
 
-### macOS (Homebrew)
+headroom requires ffmpeg. Package managers install it automatically.
 
-```bash
-brew install M-Igashi/tap/headroom
-```
+| Platform | Command |
+|----------|---------|
+| **macOS (Homebrew)** | `brew install M-Igashi/tap/headroom` |
+| **Windows (winget)** | `winget install M-Igashi.headroom` |
+| **Windows (Scoop)** | `scoop bucket add headroom https://github.com/M-Igashi/scoop-bucket && scoop install headroom` |
+| **Cargo** | `cargo install headroom` (ffmpeg must be installed separately) |
 
-ffmpeg is installed automatically as a dependency.
-
-### Windows
-
-```powershell
-# winget
-winget install M-Igashi.headroom
-winget install ffmpeg  # required separately
-
-# Scoop (ffmpeg is installed automatically)
-scoop bucket add headroom https://github.com/M-Igashi/scoop-bucket
-scoop install headroom
-```
-
-### Cargo
-
-```bash
-cargo install headroom
-```
-
-ffmpeg must be installed separately:
-
-```bash
-# macOS
-brew install ffmpeg
-
-# Ubuntu/Debian
-sudo apt install ffmpeg
-
-# Fedora
-sudo dnf install ffmpeg
-
-# Arch
-sudo pacman -S ffmpeg
-
-# Windows
-winget install ffmpeg
-```
-
-### Pre-built Binaries
-
-Download from the [Releases](https://github.com/M-Igashi/headroom/releases) page. ffmpeg must be installed separately.
-
-| Platform | File |
-|----------|------|
-| macOS (Universal) | `headroom-vX.X.X-macos-universal.tar.gz` |
-| Linux x86_64 | `headroom-vX.X.X-linux-x86_64.tar.gz` |
-| Linux ARM64 | `headroom-vX.X.X-linux-aarch64.tar.gz` |
-| Windows x86_64 | `headroom-vX.X.X-windows-x86_64.zip` |
+Pre-built binaries are available on the [Releases](https://github.com/M-Igashi/headroom/releases) page (ffmpeg must be installed separately).
 
 ### Build from Source
 
