@@ -258,23 +258,20 @@ pub fn analyze_file(path: &Path) -> Result<AudioAnalysis> {
     let (gain_method, effective_gain, mp3_gain_steps, aac_gain_steps) =
         if headroom < MIN_EFFECTIVE_GAIN {
             (GainMethod::None, 0.0, 0, 0)
-        } else if is_aac {
-            // AAC: try lossless gain in 1.5dB steps, fall back to re-encode
-            let lossless_steps = (headroom / GAIN_STEP).floor() as i32;
-            if lossless_steps >= 1 {
-                let effective = lossless_steps as f64 * GAIN_STEP;
-                (GainMethod::AacLossless, effective, 0, lossless_steps)
-            } else {
-                (GainMethod::AacReencode, headroom, 0, 0)
-            }
         } else if !is_lossy {
             (GainMethod::FfmpegLossless, headroom, 0, 0)
         } else {
-            // MP3: try lossless gain in 1.5dB steps, fall back to re-encode
+            // MP3/AAC: try lossless gain in 1.5dB steps, fall back to re-encode
             let lossless_steps = (headroom / GAIN_STEP).floor() as i32;
             if lossless_steps >= 1 {
                 let effective = lossless_steps as f64 * GAIN_STEP;
-                (GainMethod::Mp3Lossless, effective, lossless_steps, 0)
+                if is_aac {
+                    (GainMethod::AacLossless, effective, 0, lossless_steps)
+                } else {
+                    (GainMethod::Mp3Lossless, effective, lossless_steps, 0)
+                }
+            } else if is_aac {
+                (GainMethod::AacReencode, headroom, 0, 0)
             } else {
                 (GainMethod::Mp3Reencode, headroom, 0, 0)
             }

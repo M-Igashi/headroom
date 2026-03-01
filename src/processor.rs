@@ -95,26 +95,23 @@ pub fn apply_gain_ffmpeg(file_path: &Path, gain_db: f64) -> Result<()> {
     Ok(())
 }
 
-/// Apply gain to MP3 files using mp3rgain library (lossless, 1.5dB steps)
+/// Apply lossless gain to MP3 files using mp3rgain library (1.5dB steps)
 pub fn apply_gain_mp3_native(file_path: &Path, gain_steps: i32) -> Result<()> {
     if gain_steps == 0 {
         return Ok(());
     }
-
-    mp3rgain::apply_gain(file_path, gain_steps).context("mp3rgain failed to apply gain")?;
-
+    mp3rgain::apply_gain(file_path, gain_steps)
+        .context("mp3rgain failed to apply MP3 gain")?;
     Ok(())
 }
 
-/// Apply gain to AAC/M4A files using mp3rgain library (lossless, 1.5dB steps)
+/// Apply lossless gain to AAC/M4A files using mp3rgain library (1.5dB steps)
 pub fn apply_gain_aac_native(file_path: &Path, gain_steps: i32) -> Result<()> {
     if gain_steps == 0 {
         return Ok(());
     }
-
     mp3rgain::aac::apply_aac_gain(file_path, gain_steps)
         .context("mp3rgain failed to apply AAC gain")?;
-
     Ok(())
 }
 

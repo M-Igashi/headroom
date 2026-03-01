@@ -42,10 +42,8 @@ pub fn generate_csv(analyses: &[AudioAnalysis], output_dir: &Path) -> Result<std
             .unwrap_or_else(|| "-".to_string());
         let method = match analysis.gain_method {
             GainMethod::FfmpegLossless => "ffmpeg",
-            GainMethod::Mp3Lossless => "native",
-            GainMethod::AacLossless => "native",
-            GainMethod::Mp3Reencode => "re-encode",
-            GainMethod::AacReencode => "re-encode",
+            GainMethod::Mp3Lossless | GainMethod::AacLossless => "native",
+            GainMethod::Mp3Reencode | GainMethod::AacReencode => "re-encode",
             GainMethod::None => "none",
         };
 
@@ -241,11 +239,7 @@ impl AnalysisSummary {
     }
 
     pub fn total(&self) -> usize {
-        self.lossless_count
-            + self.mp3_lossless_count
-            + self.aac_lossless_count
-            + self.mp3_reencode_count
-            + self.aac_reencode_count
+        self.total_lossless() + self.total_reencode()
     }
 
     pub fn has_processable(&self) -> bool {

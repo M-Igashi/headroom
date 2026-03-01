@@ -112,11 +112,8 @@ pub fn run() -> Result<()> {
     let files_to_process: Vec<_> = all_analyses
         .iter()
         .filter(|a| match a.gain_method {
-            GainMethod::FfmpegLossless => true,
-            GainMethod::Mp3Lossless => true,
-            GainMethod::AacLossless => true,
-            GainMethod::Mp3Reencode => allow_reencode,
-            GainMethod::AacReencode => allow_reencode,
+            GainMethod::FfmpegLossless | GainMethod::Mp3Lossless | GainMethod::AacLossless => true,
+            GainMethod::Mp3Reencode | GainMethod::AacReencode => allow_reencode,
             GainMethod::None => false,
         })
         .collect();
