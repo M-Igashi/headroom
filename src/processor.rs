@@ -69,7 +69,12 @@ pub fn apply_gain_ffmpeg(file_path: &Path, gain_db: f64) -> Result<()> {
             ]);
         }
         "wav" => {
-            args.extend(["-c:a".to_string(), "pcm_s24le".to_string()]);
+            args.extend([
+                "-c:a".to_string(),
+                "pcm_s24le".to_string(),
+                "-write_bext".to_string(),
+                "1".to_string(),
+            ]);
         }
         _ => {}
     }
