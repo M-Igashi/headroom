@@ -61,7 +61,12 @@ pub fn apply_gain_ffmpeg(file_path: &Path, gain_db: f64) -> Result<()> {
             args.extend(["-c:a".to_string(), "flac".to_string()]);
         }
         "aiff" | "aif" => {
-            args.extend(["-c:a".to_string(), "pcm_s24be".to_string()]);
+            args.extend([
+                "-c:a".to_string(),
+                "pcm_s24be".to_string(),
+                "-write_id3v2".to_string(),
+                "1".to_string(),
+            ]);
         }
         "wav" => {
             args.extend(["-c:a".to_string(), "pcm_s24le".to_string()]);
