@@ -66,7 +66,6 @@ pub fn run() -> Result<()> {
     let processable_analyses: Vec<_> = all_analyses
         .iter()
         .filter(|a| a.has_headroom())
-        .cloned()
         .collect();
 
     let csv_path = report::generate_csv(&processable_analyses, &target_dir)?;
@@ -111,11 +110,7 @@ pub fn run() -> Result<()> {
     // Filter files to process
     let files_to_process: Vec<_> = all_analyses
         .iter()
-        .filter(|a| match a.gain_method {
-            GainMethod::FfmpegLossless | GainMethod::Mp3Lossless | GainMethod::AacLossless => true,
-            GainMethod::Mp3Reencode | GainMethod::AacReencode => allow_reencode,
-            GainMethod::None => false,
-        })
+        .filter(|a| a.has_headroom() && (!a.requires_reencode() || allow_reencode))
         .collect();
 
     if files_to_process.is_empty() {
@@ -124,12 +119,7 @@ pub fn run() -> Result<()> {
     }
 
     // Process files
-    process_files(
-        &files_to_process,
-        &target_dir,
-        backup_dir.as_deref(),
-        allow_reencode,
-    )?;
+    process_files(&files_to_process, &target_dir, backup_dir.as_deref())?;
 
     // Final summary
     println!(
@@ -302,7 +292,6 @@ fn process_files(
     analyses: &[&AudioAnalysis],
     base_dir: &std::path::Path,
     backup_dir: Option<&std::path::Path>,
-    allow_reencode: bool,
 ) -> Result<()> {
     let pb = ProgressBar::new(analyses.len() as u64);
     pb.set_style(
@@ -313,23 +302,13 @@ fn process_files(
     );
 
     for analysis in analyses {
-        let result = processor::process_file(
-            &analysis.path,
-            analysis,
-            base_dir,
-            backup_dir,
-            allow_reencode,
-        );
-
-        if !result.success {
-            if let Some(err) = result.error {
-                pb.println(format!(
-                    "{} {}: {}",
-                    style("⚠").yellow(),
-                    analysis.filename,
-                    err
-                ));
-            }
+        if let Err(e) = processor::process_file(&analysis.path, analysis, base_dir, backup_dir) {
+            pb.println(format!(
+                "{} {}: {}",
+                style("⚠").yellow(),
+                analysis.filename,
+                e
+            ));
         }
         pb.inc(1);
     }

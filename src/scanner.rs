@@ -18,16 +18,9 @@ pub fn scan_audio_files(dir: &Path) -> Vec<PathBuf> {
             }
 
             // Check extension
-            e.path()
-                .extension()
-                .and_then(|ext| ext.to_str())
-                .map(|ext| {
-                    let ext_lower = ext.to_lowercase();
-                    LOSSLESS_EXTENSIONS.contains(&ext_lower.as_str())
-                        || MP3_EXTENSIONS.contains(&ext_lower.as_str())
-                        || AAC_EXTENSIONS.contains(&ext_lower.as_str())
-                })
-                .unwrap_or(false)
+            has_extension(e.path(), LOSSLESS_EXTENSIONS)
+                || has_extension(e.path(), MP3_EXTENSIONS)
+                || has_extension(e.path(), AAC_EXTENSIONS)
         })
         .map(|e| e.path().to_path_buf())
         .collect()
@@ -43,7 +36,7 @@ pub fn get_supported_extensions() -> Vec<&'static str> {
 fn has_extension(path: &Path, extensions: &[&str]) -> bool {
     path.extension()
         .and_then(|ext| ext.to_str())
-        .map(|ext| extensions.contains(&ext.to_lowercase().as_str()))
+        .map(|ext| extensions.iter().any(|e| ext.eq_ignore_ascii_case(e)))
         .unwrap_or(false)
 }
 

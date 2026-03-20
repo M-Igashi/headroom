@@ -54,21 +54,11 @@ pub struct AudioAnalysis {
     pub target_tp: f64,          // Target True Peak ceiling for re-encode (dBTP)
     pub headroom: f64,           // Available gain to target_tp (dB)
     pub gain_method: GainMethod, // How this file should be processed
-    pub effective_gain: f64,     // Actual gain to apply
-    pub mp3_gain_steps: i32,     // For MP3 lossless: number of gain steps
-    pub aac_gain_steps: i32,     // For AAC lossless: number of gain steps
+    pub effective_gain: f64,        // Actual gain to apply
+    pub lossless_gain_steps: i32,   // For MP3/AAC lossless: number of gain steps
 }
 
 impl AudioAnalysis {
-    /// Returns true if this file can be processed with lossless methods
-    #[allow(dead_code)]
-    pub fn can_lossless_process(&self) -> bool {
-        matches!(
-            self.gain_method,
-            GainMethod::FfmpegLossless | GainMethod::Mp3Lossless | GainMethod::AacLossless
-        )
-    }
-
     /// Returns true if this file requires re-encoding
     pub fn requires_reencode(&self) -> bool {
         matches!(
@@ -255,27 +245,26 @@ pub fn analyze_file(path: &Path) -> Result<AudioAnalysis> {
     let target_tp = get_target_true_peak(is_lossy, bitrate_kbps);
     let headroom = target_tp - input_tp;
 
-    let (gain_method, effective_gain, mp3_gain_steps, aac_gain_steps) =
-        if headroom < MIN_EFFECTIVE_GAIN {
-            (GainMethod::None, 0.0, 0, 0)
-        } else if !is_lossy {
-            (GainMethod::FfmpegLossless, headroom, 0, 0)
-        } else {
-            // MP3/AAC: try lossless gain in 1.5dB steps, fall back to re-encode
-            let lossless_steps = (headroom / GAIN_STEP).floor() as i32;
-            if lossless_steps >= 1 {
-                let effective = lossless_steps as f64 * GAIN_STEP;
-                if is_aac {
-                    (GainMethod::AacLossless, effective, 0, lossless_steps)
-                } else {
-                    (GainMethod::Mp3Lossless, effective, lossless_steps, 0)
-                }
-            } else if is_aac {
-                (GainMethod::AacReencode, headroom, 0, 0)
+    let (gain_method, effective_gain, lossless_gain_steps) = if headroom < MIN_EFFECTIVE_GAIN {
+        (GainMethod::None, 0.0, 0)
+    } else if !is_lossy {
+        (GainMethod::FfmpegLossless, headroom, 0)
+    } else {
+        // MP3/AAC: try lossless gain in 1.5dB steps, fall back to re-encode
+        let lossless_steps = (headroom / GAIN_STEP).floor() as i32;
+        if lossless_steps >= 1 {
+            let effective = lossless_steps as f64 * GAIN_STEP;
+            if is_aac {
+                (GainMethod::AacLossless, effective, lossless_steps)
             } else {
-                (GainMethod::Mp3Reencode, headroom, 0, 0)
+                (GainMethod::Mp3Lossless, effective, lossless_steps)
             }
-        };
+        } else if is_aac {
+            (GainMethod::AacReencode, headroom, 0)
+        } else {
+            (GainMethod::Mp3Reencode, headroom, 0)
+        }
+    };
 
     let filename = path
         .file_name()
@@ -295,8 +284,7 @@ pub fn analyze_file(path: &Path) -> Result<AudioAnalysis> {
         headroom,
         gain_method,
         effective_gain,
-        mp3_gain_steps,
-        aac_gain_steps,
+        lossless_gain_steps,
     })
 }
 
