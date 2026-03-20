@@ -75,7 +75,7 @@ $ cd ~/Music/DJ-Tracks
 $ headroom
 
 ╭─────────────────────────────────────╮
-│          headroom v1.7.1            │
+│          headroom v1.7.2            │
 │   Audio Loudness Analyzer & Gain    │
 ╰─────────────────────────────────────╯
 
