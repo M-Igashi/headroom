@@ -305,7 +305,7 @@ version = "1.7.1"
 dependencies = [
  "anyhow",
  "chrono",
- "console 0.15.11",
+ "console 0.16.3",
  "csv",
  "dialoguer",
  "indicatif 0.18.4",

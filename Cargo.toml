@@ -12,7 +12,7 @@ categories = ["command-line-utilities", "multimedia::audio"]
 [dependencies]
 # CLI interaction
 dialoguer = "0.12"
-console = "0.15"
+console = "0.16"
 indicatif = "0.18"
 
 # Data handling
