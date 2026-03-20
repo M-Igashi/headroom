@@ -5,11 +5,6 @@ use std::process::Command;
 
 use crate::analyzer::{AudioAnalysis, GainMethod};
 
-pub struct ProcessResult {
-    pub success: bool,
-    pub error: Option<String>,
-}
-
 pub fn create_backup_dir(base_dir: &Path) -> Result<PathBuf> {
     let backup_dir = base_dir.join("backup");
     fs::create_dir_all(&backup_dir).context("Failed to create backup directory")?;
@@ -236,38 +231,22 @@ pub fn process_file(
     analysis: &AudioAnalysis,
     base_dir: &Path,
     backup_dir: Option<&Path>,
-    allow_reencode: bool,
-) -> ProcessResult {
-    let mut result = ProcessResult {
-        success: false,
-        error: None,
-    };
-
+) -> Result<()> {
     // Skip if no effective gain to apply
     if !analysis.has_headroom() {
-        result.success = true;
-        return result;
-    }
-
-    // Skip re-encode files if not allowed
-    if analysis.requires_reencode() && !allow_reencode {
-        result.success = true;
-        return result;
+        return Ok(());
     }
 
     // Backup if requested
     if let Some(backup) = backup_dir {
-        if let Err(e) = backup_file(file_path, base_dir, backup) {
-            result.error = Some(format!("Backup failed: {}", e));
-            return result;
-        }
+        backup_file(file_path, base_dir, backup).context("Backup failed")?;
     }
 
     // Apply gain based on method
-    let apply_result = match analysis.gain_method {
+    match analysis.gain_method {
         GainMethod::FfmpegLossless => apply_gain_ffmpeg(file_path, analysis.effective_gain),
-        GainMethod::Mp3Lossless => apply_gain_mp3_native(file_path, analysis.mp3_gain_steps),
-        GainMethod::AacLossless => apply_gain_aac_native(file_path, analysis.aac_gain_steps),
+        GainMethod::Mp3Lossless => apply_gain_mp3_native(file_path, analysis.lossless_gain_steps),
+        GainMethod::AacLossless => apply_gain_aac_native(file_path, analysis.lossless_gain_steps),
         GainMethod::Mp3Reencode => {
             apply_gain_mp3_reencode(file_path, analysis.effective_gain, analysis.bitrate_kbps)
         }
@@ -275,14 +254,5 @@ pub fn process_file(
             apply_gain_aac_reencode(file_path, analysis.effective_gain, analysis.bitrate_kbps)
         }
         GainMethod::None => Ok(()),
-    };
-
-    match apply_result {
-        Ok(()) => result.success = true,
-        Err(e) => {
-            result.error = Some(format!("Gain adjustment failed: {}", e));
-        }
     }
-
-    result
 }
