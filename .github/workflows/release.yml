@@ -59,7 +59,7 @@ jobs:
           echo "SHA256=$SHA256" >> $GITHUB_OUTPUT
 
       - name: Upload artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: macos-universal
           path: release/headroom-${{ steps.version.outputs.VERSION }}-macos-universal.tar.gz
@@ -68,7 +68,7 @@ jobs:
         run: echo "${{ steps.sha256.outputs.SHA256 }}" > sha256-macos-universal.txt
 
       - name: Upload SHA256
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: sha256-macos-universal
           path: sha256-macos-universal.txt
@@ -105,7 +105,7 @@ jobs:
           echo "SHA256=$SHA256" >> $GITHUB_OUTPUT
 
       - name: Upload artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: linux-x86_64
           path: release/headroom-${{ steps.version.outputs.VERSION }}-linux-x86_64.tar.gz
@@ -114,7 +114,7 @@ jobs:
         run: echo "${{ steps.sha256.outputs.SHA256 }}" > sha256-linux-x86_64.txt
 
       - name: Upload SHA256
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: sha256-linux-x86_64
           path: sha256-linux-x86_64.txt
@@ -154,7 +154,7 @@ jobs:
           echo "SHA256=$SHA256" >> $GITHUB_OUTPUT
 
       - name: Upload artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: linux-aarch64
           path: release/headroom-${{ steps.version.outputs.VERSION }}-linux-aarch64.tar.gz
@@ -163,7 +163,7 @@ jobs:
         run: echo "${{ steps.sha256.outputs.SHA256 }}" > sha256-linux-aarch64.txt
 
       - name: Upload SHA256
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: sha256-linux-aarch64
           path: sha256-linux-aarch64.txt
@@ -202,7 +202,7 @@ jobs:
           echo "SHA256=$hash" >> $env:GITHUB_OUTPUT
 
       - name: Upload artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: windows-x86_64
           path: release/headroom-${{ steps.version.outputs.VERSION }}-windows-x86_64.zip
@@ -212,7 +212,7 @@ jobs:
         run: echo "${{ steps.sha256.outputs.SHA256 }}" > sha256-windows-x86_64.txt
 
       - name: Upload SHA256
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: sha256-windows-x86_64
           path: sha256-windows-x86_64.txt
