@@ -287,7 +287,7 @@ jobs:
 
       - name: Create Release (with custom notes)
         if: steps.release_notes.outputs.exists == 'true'
-        uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631 # v2
+        uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe # v2
         with:
           files: |
             release/headroom-${{ steps.version.outputs.VERSION }}-macos-universal.tar.gz
@@ -300,7 +300,7 @@ jobs:
 
       - name: Create Release (auto-generated notes)
         if: steps.release_notes.outputs.exists == 'false'
-        uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631 # v2
+        uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe # v2
         with:
           files: |
             release/headroom-${{ steps.version.outputs.VERSION }}-macos-universal.tar.gz
