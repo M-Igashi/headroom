@@ -11,7 +11,7 @@ categories = ["command-line-utilities", "multimedia::audio"]
 
 [dependencies]
 # CLI interaction
-dialoguer = "0.11"
+dialoguer = "0.12"
 console = "0.15"
 indicatif = "0.17"
 
