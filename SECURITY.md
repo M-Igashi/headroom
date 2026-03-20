@@ -2,20 +2,25 @@
 
 ## Supported Versions
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
-
 | Version | Supported          |
 | ------- | ------------------ |
-| 5.1.x   | :white_check_mark: |
-| 5.0.x   | :x:                |
-| 4.0.x   | :white_check_mark: |
-| < 4.0   | :x:                |
+| latest  | :white_check_mark: |
+
+Only the latest release receives security fixes.
 
 ## Reporting a Vulnerability
 
-Use this section to tell people how to report a vulnerability.
+If you discover a security vulnerability, please report it responsibly:
 
-Tell them where to go, how often they can expect to get an update on a
-reported vulnerability, what to expect if the vulnerability is accepted or
-declined, etc.
+1. **Do NOT open a public issue**
+2. Use [GitHub's private vulnerability reporting](https://github.com/M-Igashi/headroom/security/advisories/new)
+
+You should receive an initial response within 72 hours.
+
+## Scope
+
+This project is a CLI tool that processes local audio files. The primary security concerns are:
+
+- Command injection via filenames passed to ffmpeg
+- Dependency vulnerabilities in Rust crates
+- Malicious input files causing unexpected behavior
