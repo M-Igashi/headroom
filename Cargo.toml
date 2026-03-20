@@ -13,7 +13,7 @@ categories = ["command-line-utilities", "multimedia::audio"]
 # CLI interaction
 dialoguer = "0.12"
 console = "0.15"
-indicatif = "0.17"
+indicatif = "0.18"
 
 # Data handling
 serde = { version = "1.0", features = ["derive"] }
