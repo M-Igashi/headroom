@@ -48,14 +48,18 @@ jobs:
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
       - name: Create tarball
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
         run: |
           cd release
-          tar -czvf headroom-${{ steps.version.outputs.VERSION }}-macos-universal.tar.gz headroom
+          tar -czvf headroom-${VERSION}-macos-universal.tar.gz headroom
 
       - name: Calculate SHA256
         id: sha256
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
         run: |
-          SHA256=$(shasum -a 256 release/headroom-${{ steps.version.outputs.VERSION }}-macos-universal.tar.gz | awk '{print $1}')
+          SHA256=$(shasum -a 256 release/headroom-${VERSION}-macos-universal.tar.gz | awk '{print $1}')
           echo "SHA256=$SHA256" >> $GITHUB_OUTPUT
 
       - name: Upload artifact
@@ -65,7 +69,9 @@ jobs:
           path: release/headroom-${{ steps.version.outputs.VERSION }}-macos-universal.tar.gz
 
       - name: Save SHA256
-        run: echo "${{ steps.sha256.outputs.SHA256 }}" > sha256-macos-universal.txt
+        env:
+          SHA256: ${{ steps.sha256.outputs.SHA256 }}
+        run: echo "$SHA256" > sha256-macos-universal.txt
 
       - name: Upload SHA256
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
@@ -92,16 +98,20 @@ jobs:
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
       - name: Create tarball
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
         run: |
           mkdir -p release
           cp target/release/headroom release/
           cd release
-          tar -czvf headroom-${{ steps.version.outputs.VERSION }}-linux-x86_64.tar.gz headroom
+          tar -czvf headroom-${VERSION}-linux-x86_64.tar.gz headroom
 
       - name: Calculate SHA256
         id: sha256
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
         run: |
-          SHA256=$(sha256sum release/headroom-${{ steps.version.outputs.VERSION }}-linux-x86_64.tar.gz | awk '{print $1}')
+          SHA256=$(sha256sum release/headroom-${VERSION}-linux-x86_64.tar.gz | awk '{print $1}')
           echo "SHA256=$SHA256" >> $GITHUB_OUTPUT
 
       - name: Upload artifact
@@ -111,7 +121,9 @@ jobs:
           path: release/headroom-${{ steps.version.outputs.VERSION }}-linux-x86_64.tar.gz
 
       - name: Save SHA256
-        run: echo "${{ steps.sha256.outputs.SHA256 }}" > sha256-linux-x86_64.txt
+        env:
+          SHA256: ${{ steps.sha256.outputs.SHA256 }}
+        run: echo "$SHA256" > sha256-linux-x86_64.txt
 
       - name: Upload SHA256
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
@@ -141,16 +153,20 @@ jobs:
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
       - name: Create tarball
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
         run: |
           mkdir -p release
           cp target/aarch64-unknown-linux-gnu/release/headroom release/
           cd release
-          tar -czvf headroom-${{ steps.version.outputs.VERSION }}-linux-aarch64.tar.gz headroom
+          tar -czvf headroom-${VERSION}-linux-aarch64.tar.gz headroom
 
       - name: Calculate SHA256
         id: sha256
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
         run: |
-          SHA256=$(sha256sum release/headroom-${{ steps.version.outputs.VERSION }}-linux-aarch64.tar.gz | awk '{print $1}')
+          SHA256=$(sha256sum release/headroom-${VERSION}-linux-aarch64.tar.gz | awk '{print $1}')
           echo "SHA256=$SHA256" >> $GITHUB_OUTPUT
 
       - name: Upload artifact
@@ -160,7 +176,9 @@ jobs:
           path: release/headroom-${{ steps.version.outputs.VERSION }}-linux-aarch64.tar.gz
 
       - name: Save SHA256
-        run: echo "${{ steps.sha256.outputs.SHA256 }}" > sha256-linux-aarch64.txt
+        env:
+          SHA256: ${{ steps.sha256.outputs.SHA256 }}
+        run: echo "$SHA256" > sha256-linux-aarch64.txt
 
       - name: Upload SHA256
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
@@ -189,16 +207,20 @@ jobs:
 
       - name: Create zip
         shell: pwsh
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
         run: |
           New-Item -ItemType Directory -Force -Path release
           Copy-Item target\release\headroom.exe release\
-          Compress-Archive -Path release\headroom.exe -DestinationPath release\headroom-${{ steps.version.outputs.VERSION }}-windows-x86_64.zip
+          Compress-Archive -Path release\headroom.exe -DestinationPath release\headroom-${env:VERSION}-windows-x86_64.zip
 
       - name: Calculate SHA256
         id: sha256
         shell: pwsh
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
         run: |
-          $hash = (Get-FileHash release\headroom-${{ steps.version.outputs.VERSION }}-windows-x86_64.zip -Algorithm SHA256).Hash.ToLower()
+          $hash = (Get-FileHash release\headroom-${env:VERSION}-windows-x86_64.zip -Algorithm SHA256).Hash.ToLower()
           echo "SHA256=$hash" >> $env:GITHUB_OUTPUT
 
       - name: Upload artifact
@@ -209,7 +231,9 @@ jobs:
 
       - name: Save SHA256
         shell: bash
-        run: echo "${{ steps.sha256.outputs.SHA256 }}" > sha256-windows-x86_64.txt
+        env:
+          SHA256: ${{ steps.sha256.outputs.SHA256 }}
+        run: echo "$SHA256" > sha256-windows-x86_64.txt
 
       - name: Upload SHA256
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
@@ -256,13 +280,15 @@ jobs:
           mv artifacts/windows-x86_64/*.zip release/
 
       - name: Create checksums file
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
         run: |
           cd release
-          cat ../artifacts/sha256-macos-universal/sha256-macos-universal.txt | while read hash; do echo "$hash  headroom-${{ steps.version.outputs.VERSION }}-macos-universal.tar.gz"; done > checksums.txt
-          cat ../artifacts/sha256-linux-x86_64/sha256-linux-x86_64.txt | while read hash; do echo "$hash  headroom-${{ steps.version.outputs.VERSION }}-linux-x86_64.tar.gz"; done >> checksums.txt
-          cat ../artifacts/sha256-linux-aarch64/sha256-linux-aarch64.txt | while read hash; do echo "$hash  headroom-${{ steps.version.outputs.VERSION }}-linux-aarch64.tar.gz"; done >> checksums.txt
-          cat ../artifacts/sha256-windows-x86_64/sha256-windows-x86_64.txt | while read hash; do echo "$hash  headroom-${{ steps.version.outputs.VERSION }}-windows-x86_64.zip"; done >> checksums.txt
-          mv checksums.txt headroom-${{ steps.version.outputs.VERSION }}-checksums.txt
+          cat ../artifacts/sha256-macos-universal/sha256-macos-universal.txt | while read hash; do echo "$hash  headroom-${VERSION}-macos-universal.tar.gz"; done > checksums.txt
+          cat ../artifacts/sha256-linux-x86_64/sha256-linux-x86_64.txt | while read hash; do echo "$hash  headroom-${VERSION}-linux-x86_64.tar.gz"; done >> checksums.txt
+          cat ../artifacts/sha256-linux-aarch64/sha256-linux-aarch64.txt | while read hash; do echo "$hash  headroom-${VERSION}-linux-aarch64.tar.gz"; done >> checksums.txt
+          cat ../artifacts/sha256-windows-x86_64/sha256-windows-x86_64.txt | while read hash; do echo "$hash  headroom-${VERSION}-windows-x86_64.zip"; done >> checksums.txt
+          mv checksums.txt headroom-${VERSION}-checksums.txt
 
       - name: Get macOS SHA256
         id: macos_sha256
@@ -400,4 +426,3 @@ jobs:
           git add Formula/headroom.rb
           git commit -m "headroom ${VERSION_NUM}"
           git push
-
