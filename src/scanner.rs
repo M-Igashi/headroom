@@ -18,8 +18,6 @@ pub fn scan_audio_files(dir: &Path) -> Vec<PathBuf> {
             if filename.starts_with("._") {
                 return false;
             }
-
-            // Check extension
             is_supported_audio_file(e.path())
         })
         .map(|e| e.path().to_path_buf())
@@ -106,11 +104,6 @@ fn has_extension(path: &Path, extensions: &[&str]) -> bool {
 
 pub fn is_mp3(path: &Path) -> bool {
     has_extension(path, MP3_EXTENSIONS)
-}
-
-#[allow(dead_code)]
-pub fn is_lossless(path: &Path) -> bool {
-    has_extension(path, LOSSLESS_EXTENSIONS)
 }
 
 pub fn is_aac(path: &Path) -> bool {

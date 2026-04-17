@@ -12,14 +12,14 @@ pub fn create_backup_dir(base_dir: &Path) -> Result<PathBuf> {
 }
 
 pub fn backup_file(file_path: &Path, base_dir: &Path, backup_dir: &Path) -> Result<PathBuf> {
-    // Calculate relative path from base_dir to preserve directory structure
+    // Preserve directory structure relative to base_dir so sibling files with
+    // the same name in different folders don't collide in the backup.
     let relative_path = file_path
         .strip_prefix(base_dir)
         .unwrap_or(file_path.file_name().map(Path::new).unwrap_or(file_path));
 
     let backup_path = backup_dir.join(relative_path);
 
-    // Create parent directories if needed
     if let Some(parent) = backup_path.parent() {
         fs::create_dir_all(parent).context("Failed to create backup subdirectory")?;
     }
@@ -29,9 +29,18 @@ pub fn backup_file(file_path: &Path, base_dir: &Path, backup_dir: &Path) -> Resu
     Ok(backup_path)
 }
 
+fn replace_file_with_temp(file_path: &Path, temp_path: &Path) -> Result<()> {
+    fs::remove_file(file_path).context("Failed to remove original file")?;
+    fs::rename(temp_path, file_path).context("Failed to rename processed file")?;
+    Ok(())
+}
+
+fn path_str(path: &Path) -> Result<&str> {
+    path.to_str().ok_or_else(|| anyhow!("Invalid path: {}", path.display()))
+}
+
 /// Apply gain to lossless files using ffmpeg volume filter
 pub fn apply_gain_ffmpeg(file_path: &Path, gain_db: f64) -> Result<()> {
-    // Create temp file with same extension
     let extension = file_path
         .extension()
         .and_then(|e| e.to_str())
@@ -42,15 +51,11 @@ pub fn apply_gain_ffmpeg(file_path: &Path, gain_db: f64) -> Result<()> {
     let mut args = vec![
         "-y".to_string(),
         "-i".to_string(),
-        file_path
-            .to_str()
-            .ok_or_else(|| anyhow!("Invalid path"))?
-            .to_string(),
+        path_str(file_path)?.to_string(),
         "-af".to_string(),
         format!("volume={}dB", gain_db),
     ];
 
-    // Add format-specific encoding options
     match extension.to_lowercase().as_str() {
         "flac" => {
             args.extend(["-c:a".to_string(), "flac".to_string()]);
@@ -74,12 +79,7 @@ pub fn apply_gain_ffmpeg(file_path: &Path, gain_db: f64) -> Result<()> {
         _ => {}
     }
 
-    args.push(
-        temp_path
-            .to_str()
-            .ok_or_else(|| anyhow!("Invalid temp path"))?
-            .to_string(),
-    );
+    args.push(path_str(&temp_path)?.to_string());
 
     let output = Command::new("ffmpeg")
         .args(&args)
@@ -87,17 +87,12 @@ pub fn apply_gain_ffmpeg(file_path: &Path, gain_db: f64) -> Result<()> {
         .context("Failed to execute ffmpeg for gain adjustment")?;
 
     if !output.status.success() {
-        // Clean up temp file if it exists
         let _ = fs::remove_file(&temp_path);
         let stderr = String::from_utf8_lossy(&output.stderr);
         return Err(anyhow!("ffmpeg failed: {}", stderr));
     }
 
-    // Replace original with processed file
-    fs::remove_file(file_path).context("Failed to remove original file")?;
-    fs::rename(&temp_path, file_path).context("Failed to rename processed file")?;
-
-    Ok(())
+    replace_file_with_temp(file_path, &temp_path)
 }
 
 /// Apply lossless gain to MP3 files using mp3rgain library (1.5dB steps)
@@ -120,110 +115,88 @@ pub fn apply_gain_aac_native(file_path: &Path, gain_steps: i32) -> Result<()> {
     Ok(())
 }
 
+fn apply_gain_reencode(
+    file_path: &Path,
+    gain_db: f64,
+    bitrate_kbps: Option<u32>,
+    temp_ext: &str,
+    default_bitrate: &str,
+    encoders: &[&str],
+    label: &str,
+) -> Result<()> {
+    let temp_path = file_path.with_extension(temp_ext);
+    let bitrate = bitrate_kbps
+        .map(|kbps| format!("{}k", kbps))
+        .unwrap_or_else(|| default_bitrate.to_string());
+
+    let input = path_str(file_path)?;
+    let temp = path_str(&temp_path)?;
+
+    for encoder in encoders {
+        let args = [
+            "-y",
+            "-i",
+            input,
+            "-af",
+            &format!("volume={}dB", gain_db),
+            "-c:a",
+            encoder,
+            "-b:a",
+            &bitrate,
+            temp,
+        ];
+
+        let output = Command::new("ffmpeg")
+            .args(args)
+            .output()
+            .with_context(|| format!("Failed to execute ffmpeg for {} re-encode", label))?;
+
+        if output.status.success() {
+            return replace_file_with_temp(file_path, &temp_path);
+        }
+
+        let _ = fs::remove_file(&temp_path);
+    }
+
+    Err(anyhow!(
+        "ffmpeg {} re-encode failed with all available encoders",
+        label
+    ))
+}
+
 /// Apply gain to MP3 files by re-encoding (lossy, but precise control)
 pub fn apply_gain_mp3_reencode(
     file_path: &Path,
     gain_db: f64,
     bitrate_kbps: Option<u32>,
 ) -> Result<()> {
-    let temp_path = file_path.with_extension("tmp.mp3");
-
-    // Determine target bitrate (preserve original or use 320k for high quality)
-    let bitrate = bitrate_kbps
-        .map(|kbps| format!("{}k", kbps))
-        .unwrap_or_else(|| "320k".to_string());
-
-    let args = vec![
-        "-y".to_string(),
-        "-i".to_string(),
-        file_path
-            .to_str()
-            .ok_or_else(|| anyhow!("Invalid path"))?
-            .to_string(),
-        "-af".to_string(),
-        format!("volume={}dB", gain_db),
-        "-c:a".to_string(),
-        "libmp3lame".to_string(),
-        "-b:a".to_string(),
-        bitrate,
-        temp_path
-            .to_str()
-            .ok_or_else(|| anyhow!("Invalid temp path"))?
-            .to_string(),
-    ];
-
-    let output = Command::new("ffmpeg")
-        .args(&args)
-        .output()
-        .context("Failed to execute ffmpeg for MP3 re-encode")?;
-
-    if !output.status.success() {
-        let _ = fs::remove_file(&temp_path);
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(anyhow!("ffmpeg MP3 re-encode failed: {}", stderr));
-    }
-
-    // Replace original with processed file
-    fs::remove_file(file_path).context("Failed to remove original file")?;
-    fs::rename(&temp_path, file_path).context("Failed to rename processed file")?;
-
-    Ok(())
+    apply_gain_reencode(
+        file_path,
+        gain_db,
+        bitrate_kbps,
+        "tmp.mp3",
+        "320k",
+        &["libmp3lame"],
+        "MP3",
+    )
 }
 
-/// Apply gain to AAC/M4A files by re-encoding (always required, no lossless option)
+/// Apply gain to AAC/M4A files by re-encoding (always required, no lossless option).
+/// Tries libfdk_aac first (higher quality), falls back to built-in aac.
 pub fn apply_gain_aac_reencode(
     file_path: &Path,
     gain_db: f64,
     bitrate_kbps: Option<u32>,
 ) -> Result<()> {
-    let temp_path = file_path.with_extension("tmp.m4a");
-
-    let bitrate = bitrate_kbps
-        .map(|kbps| format!("{}k", kbps))
-        .unwrap_or_else(|| "256k".to_string());
-
-    // Try libfdk_aac first (higher quality), fallback to built-in aac
-    let encoders = ["libfdk_aac", "aac"];
-
-    for encoder in &encoders {
-        let args = vec![
-            "-y".to_string(),
-            "-i".to_string(),
-            file_path
-                .to_str()
-                .ok_or_else(|| anyhow!("Invalid path"))?
-                .to_string(),
-            "-af".to_string(),
-            format!("volume={}dB", gain_db),
-            "-c:a".to_string(),
-            encoder.to_string(),
-            "-b:a".to_string(),
-            bitrate.clone(),
-            temp_path
-                .to_str()
-                .ok_or_else(|| anyhow!("Invalid temp path"))?
-                .to_string(),
-        ];
-
-        let output = Command::new("ffmpeg")
-            .args(&args)
-            .output()
-            .context("Failed to execute ffmpeg for AAC re-encode")?;
-
-        if output.status.success() {
-            // Replace original with processed file
-            fs::remove_file(file_path).context("Failed to remove original file")?;
-            fs::rename(&temp_path, file_path).context("Failed to rename processed file")?;
-            return Ok(());
-        }
-
-        // Clean up temp file if it exists before trying next encoder
-        let _ = fs::remove_file(&temp_path);
-    }
-
-    Err(anyhow!(
-        "ffmpeg AAC re-encode failed with all available encoders"
-    ))
+    apply_gain_reencode(
+        file_path,
+        gain_db,
+        bitrate_kbps,
+        "tmp.m4a",
+        "256k",
+        &["libfdk_aac", "aac"],
+        "AAC",
+    )
 }
 
 pub fn process_file(
@@ -232,17 +205,14 @@ pub fn process_file(
     base_dir: &Path,
     backup_dir: Option<&Path>,
 ) -> Result<()> {
-    // Skip if no effective gain to apply
     if !analysis.has_headroom() {
         return Ok(());
     }
 
-    // Backup if requested
     if let Some(backup) = backup_dir {
         backup_file(file_path, base_dir, backup).context("Backup failed")?;
     }
 
-    // Apply gain based on method
     match analysis.gain_method {
         GainMethod::FfmpegLossless => apply_gain_ffmpeg(file_path, analysis.effective_gain),
         GainMethod::Mp3Lossless => apply_gain_mp3_native(file_path, analysis.lossless_gain_steps),

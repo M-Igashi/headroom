@@ -5,7 +5,6 @@ use dialoguer::{theme::ColorfulTheme, Confirm};
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 
 use crate::analyzer::{self, AudioAnalysis, GainMethod};
 use crate::args::Cli;
@@ -18,7 +17,6 @@ pub fn run() -> Result<()> {
 
     print_banner();
 
-    // Check ffmpeg
     analyzer::check_ffmpeg()?;
 
     if cli.is_non_interactive() {
@@ -29,7 +27,6 @@ pub fn run() -> Result<()> {
 }
 
 fn run_interactive() -> Result<()> {
-    // Use current directory
     let target_dir = std::env::current_dir().context("Failed to get current directory")?;
 
     println!(
@@ -38,7 +35,6 @@ fn run_interactive() -> Result<()> {
         style(target_dir.display()).bold()
     );
 
-    // Scan for audio files
     let files = scanner::scan_audio_files(&target_dir);
 
     if files.is_empty() {
@@ -56,10 +52,8 @@ fn run_interactive() -> Result<()> {
         style(files.len()).cyan()
     );
 
-    // Analyze files
     let all_analyses = analyze_files(&files)?;
 
-    // Get summary
     let summary = AnalysisSummary::from_analyses(&all_analyses);
 
     if !summary.has_processable() {
@@ -71,10 +65,8 @@ fn run_interactive() -> Result<()> {
         return Ok(());
     }
 
-    // Print categorized report
     report::print_analysis_report(&all_analyses);
 
-    // Export CSV (only processable files)
     let processable_analyses: Vec<_> = all_analyses
         .iter()
         .filter(|a| a.has_headroom())
@@ -87,30 +79,25 @@ fn run_interactive() -> Result<()> {
         csv_path.display()
     );
 
-    // Process based on available files
     let has_lossless = summary.total_lossless() > 0;
     let has_reencode = summary.total_reencode() > 0;
 
-    // First dialog: Lossless processing
     if has_lossless && !prompt_lossless_processing(&summary)? {
         println!("Done. No files were modified.");
         return Ok(());
     }
 
-    // Second dialog: Re-encode processing (if applicable)
     let allow_reencode = if has_reencode {
         prompt_reencode_processing(&summary)?
     } else {
         false
     };
 
-    // Ask about backup
     let create_backup = Confirm::with_theme(&ColorfulTheme::default())
         .with_prompt("Create backup before processing?")
         .default(true)
         .interact()?;
 
-    // Create backup directory if needed
     let backup_dir = if create_backup {
         let dir = processor::create_backup_dir(&target_dir)?;
         println!("{} Backup directory: {}", style("✓").green(), dir.display());
@@ -119,7 +106,6 @@ fn run_interactive() -> Result<()> {
         None
     };
 
-    // Filter files to process
     let files_to_process: Vec<_> = all_analyses
         .iter()
         .filter(|a| a.has_headroom() && (!a.requires_reencode() || allow_reencode))
@@ -130,7 +116,6 @@ fn run_interactive() -> Result<()> {
         return Ok(());
     }
 
-    // Process files
     process_files(&files_to_process, &target_dir, backup_dir.as_deref())?;
 
     print_final_summary(&files_to_process);
@@ -139,7 +124,6 @@ fn run_interactive() -> Result<()> {
 }
 
 fn run_scriptable(cli: &Cli) -> Result<()> {
-    // Resolve input paths (default: current dir)
     let (files, base_dir) = if cli.paths.is_empty() {
         let cwd = std::env::current_dir().context("Failed to get current directory")?;
         (scanner::scan_audio_files(&cwd), cwd)
@@ -182,7 +166,6 @@ fn run_scriptable(cli: &Cli) -> Result<()> {
 
     let processable_analyses: Vec<_> = all_analyses.iter().filter(|a| a.has_headroom()).collect();
 
-    // Report generation
     if cli.report_enabled() {
         let explicit_path = cli.report.as_ref().and_then(|p| {
             if p.as_os_str().is_empty() {
@@ -226,7 +209,6 @@ fn run_scriptable(cli: &Cli) -> Result<()> {
         return Ok(());
     }
 
-    // Backup directory resolution
     let backup_dir = if let Some(path) = &cli.backup {
         let dir = if path.as_os_str().is_empty() {
             processor::create_backup_dir(&base_dir)?
@@ -388,43 +370,30 @@ fn analyze_files(files: &[PathBuf]) -> Result<Vec<AudioAnalysis>> {
             .progress_chars("█▓░"),
     );
 
-    // Thread-safe collection for results with index to preserve order
-    let results: Mutex<Vec<(usize, Option<AudioAnalysis>)>> = Mutex::new(Vec::new());
-    let errors: Mutex<Vec<String>> = Mutex::new(Vec::new());
-
-    // Parallel analysis using rayon
-    files.par_iter().enumerate().for_each(|(idx, file)| {
-        match analyzer::analyze_file(file) {
-            Ok(analysis) => {
-                results.lock().unwrap().push((idx, Some(analysis)));
-            }
-            Err(e) => {
-                results.lock().unwrap().push((idx, None));
-                errors.lock().unwrap().push(format!(
-                    "{} Failed to analyze {}: {}",
-                    style("⚠").yellow(),
-                    file.display(),
-                    e
-                ));
-            }
-        }
-        pb.inc(1);
-    });
+    // par_iter preserves input order in the collected Vec, so indexing is unnecessary.
+    let results: Vec<Result<AudioAnalysis, (PathBuf, anyhow::Error)>> = files
+        .par_iter()
+        .map(|file| {
+            let result = analyzer::analyze_file(file).map_err(|e| (file.clone(), e));
+            pb.inc(1);
+            result
+        })
+        .collect();
 
     pb.finish_and_clear();
 
-    // Print any errors
-    for err in errors.lock().unwrap().iter() {
-        println!("{}", err);
+    let mut analyses = Vec::with_capacity(results.len());
+    for result in results {
+        match result {
+            Ok(a) => analyses.push(a),
+            Err((path, e)) => println!(
+                "{} Failed to analyze {}: {}",
+                style("⚠").yellow(),
+                path.display(),
+                e
+            ),
+        }
     }
-
-    // Sort by original index and extract successful analyses
-    let mut indexed_results = results.into_inner().unwrap();
-    indexed_results.sort_by_key(|(idx, _)| *idx);
-    let analyses: Vec<AudioAnalysis> = indexed_results
-        .into_iter()
-        .filter_map(|(_, analysis)| analysis)
-        .collect();
 
     println!("{} Analyzed {} files", style("✓").green(), analyses.len());
 

@@ -25,7 +25,6 @@ pub fn generate_csv(
 
     let mut writer = csv::Writer::from_path(&output_path).context("Failed to create CSV file")?;
 
-    // Write header
     writer
         .write_record([
             "Filename",
@@ -40,7 +39,6 @@ pub fn generate_csv(
         ])
         .context("Failed to write CSV header")?;
 
-    // Write data
     for analysis in analyses {
         let format = if analysis.is_mp3 {
             "MP3"
@@ -133,7 +131,6 @@ pub fn print_analysis_report(analyses: &[AudioAnalysis]) {
 fn print_file_table(files: &[&AudioAnalysis], filename_width: usize, accent_style: &Style) {
     let dim_style = Style::new().dim();
 
-    // Print header
     println!(
         "  {:<width$} {:>8} {:>12} {:>10} {:>12}",
         dim_style.apply_to("Filename"),
@@ -144,7 +141,6 @@ fn print_file_table(files: &[&AudioAnalysis], filename_width: usize, accent_styl
         width = filename_width,
     );
 
-    // Print rows
     for analysis in files {
         // Use character count instead of byte count to handle multi-byte UTF-8 characters
         let char_count = analysis.filename.chars().count();
