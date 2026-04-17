@@ -1,3 +1,5 @@
+use anyhow::{anyhow, Result};
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
@@ -18,12 +20,74 @@ pub fn scan_audio_files(dir: &Path) -> Vec<PathBuf> {
             }
 
             // Check extension
-            has_extension(e.path(), LOSSLESS_EXTENSIONS)
-                || has_extension(e.path(), MP3_EXTENSIONS)
-                || has_extension(e.path(), AAC_EXTENSIONS)
+            is_supported_audio_file(e.path())
         })
         .map(|e| e.path().to_path_buf())
         .collect()
+}
+
+/// Resolve a list of input strings (file paths, directories, globs) into a
+/// deduplicated, sorted list of audio files.
+pub fn resolve_inputs(inputs: &[String]) -> Result<Vec<PathBuf>> {
+    let mut collected: BTreeSet<PathBuf> = BTreeSet::new();
+
+    for input in inputs {
+        let path = PathBuf::from(input);
+
+        if path.is_dir() {
+            for file in scan_audio_files(&path) {
+                collected.insert(file);
+            }
+            continue;
+        }
+
+        if path.is_file() {
+            if is_audio_candidate(&path) {
+                collected.insert(path);
+            }
+            continue;
+        }
+
+        // Treat as glob pattern (supports e.g. "*.mp3", "music/**/*.flac")
+        let mut matched_any = false;
+        for entry in glob::glob(input)
+            .map_err(|e| anyhow!("Invalid glob pattern '{}': {}", input, e))?
+        {
+            let p = entry.map_err(|e| anyhow!("Glob error for '{}': {}", input, e))?;
+            if p.is_dir() {
+                for file in scan_audio_files(&p) {
+                    collected.insert(file);
+                }
+                matched_any = true;
+            } else if p.is_file() && is_audio_candidate(&p) {
+                collected.insert(p);
+                matched_any = true;
+            }
+        }
+
+        if !matched_any {
+            return Err(anyhow!(
+                "No matching audio files for input: '{}'",
+                input
+            ));
+        }
+    }
+
+    Ok(collected.into_iter().collect())
+}
+
+fn is_audio_candidate(path: &Path) -> bool {
+    let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+    if filename.starts_with("._") {
+        return false;
+    }
+    is_supported_audio_file(path)
+}
+
+fn is_supported_audio_file(path: &Path) -> bool {
+    has_extension(path, LOSSLESS_EXTENSIONS)
+        || has_extension(path, MP3_EXTENSIONS)
+        || has_extension(path, AAC_EXTENSIONS)
 }
 
 pub fn get_supported_extensions() -> Vec<&'static str> {

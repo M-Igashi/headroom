@@ -1,22 +1,34 @@
 use anyhow::{Context, Result};
+use clap::Parser;
 use console::{style, Style};
 use dialoguer::{theme::ColorfulTheme, Confirm};
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use crate::analyzer::{self, AudioAnalysis, GainMethod};
+use crate::args::Cli;
 use crate::processor;
 use crate::report::{self, AnalysisSummary};
 use crate::scanner;
 
 pub fn run() -> Result<()> {
+    let cli = Cli::parse();
+
     print_banner();
 
     // Check ffmpeg
     analyzer::check_ffmpeg()?;
 
+    if cli.is_non_interactive() {
+        run_scriptable(&cli)
+    } else {
+        run_interactive()
+    }
+}
+
+fn run_interactive() -> Result<()> {
     // Use current directory
     let target_dir = std::env::current_dir().context("Failed to get current directory")?;
 
@@ -26,7 +38,7 @@ pub fn run() -> Result<()> {
         style(target_dir.display()).bold()
     );
 
-    // Scan for audio files (always includes MP3)
+    // Scan for audio files
     let files = scanner::scan_audio_files(&target_dir);
 
     if files.is_empty() {
@@ -68,7 +80,7 @@ pub fn run() -> Result<()> {
         .filter(|a| a.has_headroom())
         .collect();
 
-    let csv_path = report::generate_csv(&processable_analyses, &target_dir)?;
+    let csv_path = report::generate_csv(&processable_analyses, &target_dir, None)?;
     println!(
         "{} Report saved: {}",
         style("✓").green(),
@@ -121,7 +133,140 @@ pub fn run() -> Result<()> {
     // Process files
     process_files(&files_to_process, &target_dir, backup_dir.as_deref())?;
 
-    // Final summary
+    print_final_summary(&files_to_process);
+
+    Ok(())
+}
+
+fn run_scriptable(cli: &Cli) -> Result<()> {
+    // Resolve input paths (default: current dir)
+    let (files, base_dir) = if cli.paths.is_empty() {
+        let cwd = std::env::current_dir().context("Failed to get current directory")?;
+        (scanner::scan_audio_files(&cwd), cwd)
+    } else {
+        let files = scanner::resolve_inputs(&cli.paths)?;
+        let base = common_base_dir(&files)
+            .or_else(|| std::env::current_dir().ok())
+            .unwrap_or_else(|| PathBuf::from("."));
+        (files, base)
+    };
+
+    if files.is_empty() {
+        println!("{} No audio files matched.", style("⚠").yellow());
+        println!(
+            "  Supported formats: {}",
+            scanner::get_supported_extensions().join(", ")
+        );
+        return Ok(());
+    }
+
+    println!(
+        "{} Found {} audio files",
+        style("✓").green(),
+        style(files.len()).cyan()
+    );
+
+    let all_analyses = analyze_files(&files)?;
+
+    let summary = AnalysisSummary::from_analyses(&all_analyses);
+
+    if !summary.has_processable() {
+        println!(
+            "\n{} No files with enough headroom found.",
+            style("ℹ").blue()
+        );
+        return Ok(());
+    }
+
+    report::print_analysis_report(&all_analyses);
+
+    let processable_analyses: Vec<_> = all_analyses.iter().filter(|a| a.has_headroom()).collect();
+
+    // Report generation
+    if cli.report_enabled() {
+        let explicit_path = cli.report.as_ref().and_then(|p| {
+            if p.as_os_str().is_empty() {
+                None
+            } else {
+                Some(p.as_path())
+            }
+        });
+        let csv_path = report::generate_csv(&processable_analyses, &base_dir, explicit_path)?;
+        println!(
+            "{} Report saved: {}",
+            style("✓").green(),
+            csv_path.display()
+        );
+    }
+
+    if cli.analyze_only {
+        println!("{} Analyze-only mode; no files modified.", style("ℹ").blue());
+        return Ok(());
+    }
+
+    let lossless_on = cli.lossless_enabled();
+    let reencode_on = cli.reencode_enabled();
+
+    let files_to_process: Vec<_> = all_analyses
+        .iter()
+        .filter(|a| {
+            if !a.has_headroom() {
+                return false;
+            }
+            if a.requires_reencode() {
+                reencode_on
+            } else {
+                lossless_on
+            }
+        })
+        .collect();
+
+    if files_to_process.is_empty() {
+        println!("{} No files to process with current flags.", style("ℹ").blue());
+        return Ok(());
+    }
+
+    // Backup directory resolution
+    let backup_dir = if let Some(path) = &cli.backup {
+        let dir = if path.as_os_str().is_empty() {
+            processor::create_backup_dir(&base_dir)?
+        } else {
+            std::fs::create_dir_all(path).context("Failed to create backup directory")?;
+            path.clone()
+        };
+        println!("{} Backup directory: {}", style("✓").green(), dir.display());
+        Some(dir)
+    } else {
+        None
+    };
+
+    process_files(&files_to_process, &base_dir, backup_dir.as_deref())?;
+
+    print_final_summary(&files_to_process);
+
+    Ok(())
+}
+
+fn common_base_dir(files: &[PathBuf]) -> Option<PathBuf> {
+    let mut iter = files.iter().filter_map(|f| f.parent().map(Path::to_path_buf));
+    let first = iter.next()?;
+    let base = iter.fold(first, |acc, p| common_prefix(&acc, &p));
+    Some(base)
+}
+
+fn common_prefix(a: &Path, b: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for (x, y) in a.components().zip(b.components()) {
+        if x == y {
+            out.push(x);
+        } else {
+            break;
+        }
+    }
+    out
+}
+
+fn print_final_summary(files_to_process: &[&AudioAnalysis]) {
     println!(
         "\n{} Done! {} files processed.",
         style("✓").green().bold(),
@@ -143,8 +288,6 @@ pub fn run() -> Result<()> {
             println!("  {} {} {}", style("•").dim(), count, label);
         }
     }
-
-    Ok(())
 }
 
 fn prompt_lossless_processing(summary: &AnalysisSummary) -> Result<bool> {

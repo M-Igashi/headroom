@@ -152,6 +152,10 @@ cargo build --release
 
 ## Usage
 
+### Interactive Mode
+
+Run without arguments to use the guided workflow in the current directory:
+
 ```bash
 cd ~/Music/DJ-Tracks
 headroom
@@ -163,6 +167,36 @@ The tool will guide you through:
 3. Confirming lossless processing
 4. Optionally enabling MP3/AAC re-encoding
 5. Creating backups (recommended)
+
+### Scriptable Mode
+
+Pass paths, globs, or flags to run non-interactively (useful for pipelines and scripts):
+
+```bash
+# Analyze a directory without modifying anything
+headroom --analyze-only ~/Music/DJ-Tracks
+
+# Apply only lossless gain, with backup, save report to a specific path
+headroom --lossless --backup ./bak --report results.csv ./album/
+
+# Enable re-encoding as well
+headroom --lossless --reencode --backup ./bak ./album/
+
+# Operate on specific files
+headroom --lossless track1.mp3 track2.flac
+
+# Glob patterns
+headroom --lossless --no-report "./music/**/*.mp3"
+```
+
+**Non-interactive defaults** (when any flag or path is provided):
+- `--lossless` is **on** unless `--no-lossless`
+- `--reencode` is **off** unless `--reencode` is explicitly passed
+- `--backup` is **off** unless provided; bare `--backup` uses `<target>/backup`
+- CSV report is written unless `--no-report`; `--report PATH` sets a custom location
+- `--analyze-only` runs analysis + report only, skips processing
+
+Run `headroom --help` for the full flag reference.
 
 ## Output
 

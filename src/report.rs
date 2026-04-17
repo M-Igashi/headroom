@@ -5,10 +5,23 @@ use std::path::Path;
 
 use crate::analyzer::{AudioAnalysis, GainMethod};
 
-pub fn generate_csv(analyses: &[&AudioAnalysis], output_dir: &Path) -> Result<std::path::PathBuf> {
-    let timestamp = Local::now().format("%Y%m%d_%H%M%S");
-    let filename = format!("headroom_report_{}.csv", timestamp);
-    let output_path = output_dir.join(&filename);
+pub fn generate_csv(
+    analyses: &[&AudioAnalysis],
+    output_dir: &Path,
+    explicit_path: Option<&Path>,
+) -> Result<std::path::PathBuf> {
+    let output_path = if let Some(p) = explicit_path {
+        if let Some(parent) = p.parent() {
+            if !parent.as_os_str().is_empty() {
+                std::fs::create_dir_all(parent).context("Failed to create report directory")?;
+            }
+        }
+        p.to_path_buf()
+    } else {
+        let timestamp = Local::now().format("%Y%m%d_%H%M%S");
+        let filename = format!("headroom_report_{}.csv", timestamp);
+        output_dir.join(&filename)
+    };
 
     let mut writer = csv::Writer::from_path(&output_path).context("Failed to create CSV file")?;
 
