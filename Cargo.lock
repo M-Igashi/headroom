@@ -524,9 +524,9 @@ dependencies = [
 
 [[package]]
 name = "mp3rgain"
-version = "2.2.1"
+version = "2.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d79710074c5a3bd6958e60625573d4574791e7543f6ba19cc5db6e2a28ed2ddf"
+checksum = "9860646c57eefc1ea9ca49e08c6ee3ffd655451437350737d734484da02586f0"
 dependencies = [
  "anyhow",
  "colored",
@@ -610,9 +610,9 @@ checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
 name = "rayon"
-version = "1.11.0"
+version = "1.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "368f01d005bf8fd9b1206fb6fa653e6c4a81ceb1466406b81792d87c5677a58f"
+checksum = "fb39b166781f92d482534ef4b4b1b2568f42613b53e5b6c160e24cfbfa30926d"
 dependencies = [
  "either",
  "rayon-core",
