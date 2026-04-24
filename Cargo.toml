@@ -27,7 +27,7 @@ anyhow = "1.0"
 thiserror = "2.0"
 
 # Parallel processing
-rayon = "1.10"
+rayon = "1.12"
 
 # File system
 walkdir = "2.4"
