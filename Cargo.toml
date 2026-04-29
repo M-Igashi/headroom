@@ -1,6 +1,6 @@
 [package]
 name = "headroom"
-version = "1.8.0"
+version = "1.9.0"
 edition = "2021"
 authors = ["Masanari Higashi"]
 description = "Audio loudness analyzer and gain adjustment tool for mastering workflows"
@@ -34,7 +34,7 @@ walkdir = "2.4"
 chrono = "0.4"
 
 # MP3/AAC lossless gain adjustment
-mp3rgain = { version = "2.2", default-features = false, features = ["aac"] }
+mp3rgain = { version = "2.3", default-features = false, features = ["aac"] }
 
 # Update notification
 update-informer = { version = "1.2", default-features = false, features = ["github", "ureq", "rustls-tls"] }
