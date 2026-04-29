@@ -42,6 +42,10 @@ pub struct Cli {
     /// Analyze files only, do not modify anything
     #[arg(long)]
     pub analyze_only: bool,
+
+    /// Skip checking for new versions on startup
+    #[arg(long)]
+    pub no_update_check: bool,
 }
 
 impl Cli {

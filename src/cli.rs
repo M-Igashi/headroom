@@ -11,11 +11,16 @@ use crate::args::Cli;
 use crate::processor;
 use crate::report::{self, AnalysisSummary};
 use crate::scanner;
+use crate::updater;
 
 pub fn run() -> Result<()> {
     let cli = Cli::parse();
 
     print_banner();
+
+    if !cli.no_update_check {
+        updater::check_and_notify();
+    }
 
     analyzer::check_ffmpeg()?;
 
