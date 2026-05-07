@@ -4,6 +4,7 @@
 - **New `--tp-target <DB>` flag.** Override the uniform target with any custom value, e.g. `--tp-target -1.0` for the Spotify / Apple Music / YouTube delivery max, or `--tp-target -2.0` for a conservative master that leaves headroom for player-side SRC / Hilbert downmix.
 - **New `--tp-split-bitrate` flag.** Opt back into the legacy bitrate-dependent split (-0.5 dBTP for ≥256 kbps, -1.0 dBTP for <256 kbps). Mirrors TD1008's pre-encode interpretation for users who prefer it.
 - **Native-lossless threshold scales with the chosen target.** The True Peak below which an MP3/AAC file qualifies for in-place global_gain modification is now `target − 1.5 dB` rather than the hardcoded -2.0 / -2.5 dBTP used through v1.9.x.
+- **mp3rgain bumped to v2.5.0.** Brings a fix for temp-file collisions when applying gain in parallel ([mp3rgain@4e9b0b3](https://github.com/M-Igashi/mp3rgain/commit/4e9b0b3)) — relevant because headroom applies gain across files in parallel via rayon. Also picks up faster AAC apply / ReplayGain analysis pipelines.
 
 ## Documentation
 
