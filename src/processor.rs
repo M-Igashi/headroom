@@ -55,6 +55,7 @@ pub fn apply_gain_ffmpeg(file_path: &Path, gain_db: f64) -> Result<()> {
             args.extend(["-c:a".to_string(), "flac".to_string()]);
         }
         "aiff" | "aif" => {
+            // ffmpeg's AIFF muxer drops ID3v2 chunks unless -write_id3v2 is set.
             args.extend([
                 "-c:a".to_string(),
                 "pcm_s24be".to_string(),
@@ -63,6 +64,7 @@ pub fn apply_gain_ffmpeg(file_path: &Path, gain_db: f64) -> Result<()> {
             ]);
         }
         "wav" => {
+            // -write_bext preserves Broadcast Wave Format chunks (time_reference, umid).
             args.extend([
                 "-c:a".to_string(),
                 "pcm_s24le".to_string(),
@@ -163,6 +165,7 @@ fn apply_gain_reencode(
     let label = format.label();
 
     for encoder in format.encoders() {
+        // CBR-only: adding -q:a would force libmp3lame to VBR and override -b:a.
         let args = [
             "-y", "-i", input, "-af", &volume_arg, "-c:a", encoder, "-b:a", &bitrate, temp,
         ];
