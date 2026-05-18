@@ -123,15 +123,21 @@ pub struct RbsortArgs {
     #[arg(long, value_name = "PATH")]
     pub xml: PathBuf,
 
-    /// Source playlist path, '/'-separated (e.g., "Folder/MyPlaylist")
+    /// Source playlist under the Rekordbox `Playlists` root. Optional — if
+    /// omitted, every TrackID-referenced playlist in the XML is sorted. For a
+    /// single target, use the playlist name as-is for top-level playlists
+    /// (e.g. "MyPlaylist"), or '/'-separate folder/playlist names for nested
+    /// ones (e.g. "Folder/SubFolder/MyPlaylist").
     #[arg(long, value_name = "PATH")]
-    pub playlist: String,
+    pub playlist: Option<String>,
 
-    /// Output XML path
+    /// Output XML path. Optional — defaults to the input filename with "-out"
+    /// appended to the stem, in the same directory (e.g. collection.xml -> collection-out.xml).
     #[arg(long, short, value_name = "PATH")]
-    pub output: PathBuf,
+    pub output: Option<PathBuf>,
 
-    /// Name for the new sorted playlist (default: "<source> (Key+BPM)")
+    /// Override the new playlist's name. Only valid together with `--playlist`.
+    /// When sorting all playlists, each sorted copy reuses its source name.
     #[arg(long, value_name = "NAME")]
     pub name: Option<String>,
 }

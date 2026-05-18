@@ -240,7 +240,7 @@ Run `headroom --help` for the full flag reference.
 
 *Added in v2.0.0.*
 
-Rekordbox does not expose a "sort by Key AND BPM" option in its UI. `headroom rbsort` reads your `collection.xml`, sorts a target playlist by **Camelot Key (1A → 12B) ascending** then **BPM ascending**, and appends the result as a new playlist node to the same XML. The original playlist is left untouched.
+Rekordbox does not expose a "sort by Key AND BPM" option in its UI. `headroom rbsort` reads your `collection.xml`, sorts each target playlist by **Camelot Key (1A → 12B) ascending** then **BPM ascending**, and emits the sorted copies into a new `Sorted (Key+BPM)/` folder appended to the same XML. Originals are left untouched. The layout mirrors headroom's `backup/` directory: one container folder, each item inside keeps its source name.
 
 This is the same idea as headroom's analyzer applied to playlist order: Rekordbox's software-only features (Auto Gain, multi-column sort) don't follow your tracks to the CDJ. `rbsort` bakes Key+BPM order into the playlist itself — so when you export to USB in Rekordbox's EXPORT mode, the CDJ plays the set in that exact order with no on-deck reordering.
 
@@ -250,27 +250,36 @@ This is the same idea as headroom's analyzer applied to playlist order: Rekordbo
 2. **Export**: *File > Export Collection in xml format* → e.g. `~/Music/rekordbox/collection.xml`.
 3. **Run rbsort**:
    ```bash
+   # Sort every TrackID-referenced playlist in the XML
+   headroom rbsort --xml ~/Music/rekordbox/collection.xml
+
+   # Or target one playlist (top-level: just the name)
    headroom rbsort \
      --xml ~/Music/rekordbox/collection.xml \
-     --playlist "Sets/Friday" \
-     --output ~/Music/rekordbox/sorted.xml
+     --playlist "Happy House and Trance"
+
+   # Or target one nested under a folder
+   headroom rbsort \
+     --xml ~/Music/rekordbox/collection.xml \
+     --playlist "Sets/Friday"
    ```
-4. **Point Rekordbox at the output XML**: *Preferences > Advanced > Database > rekordbox xml > Imported Library* → select `sorted.xml`, then **restart Rekordbox** (Rekordbox only re-reads the XML on startup).
-5. **Open the `rekordbox xml` tree** in the left sidebar. It is a *separate* tree from your main library — switch to it from the **sidebar icon column** on the far left (the icon labeled `rekordbox xml`). Inside you'll find `rekordbox xml > Playlists > Sets/Friday (Key+BPM)`.
-6. **Verify the sort** by clicking the new playlist — tracks should run `1A` (lowest BPM) → `1B` → `2A` → … → `12B` (highest BPM).
-7. **Drag** the sorted playlist from the `rekordbox xml` tree into your main `Playlists` collection. Your original playlist (still in `Playlists`) is unchanged.
+   Output defaults to `collection-out.xml` next to the input. Pass `--output <PATH>` to override.
+4. **Point Rekordbox at the output XML**: *Preferences > Advanced > Database > rekordbox xml > Imported Library* → select `collection-out.xml`, then **restart Rekordbox** (Rekordbox only re-reads the XML on startup).
+5. **Open the `rekordbox xml` tree** in the left sidebar. It is a *separate* tree from your main library — switch to it from the **sidebar icon column** on the far left (the icon labeled `rekordbox xml`). Inside you'll find a new folder `Sorted (Key+BPM)/` containing each sorted playlist under its original name.
+6. **Verify the sort** by clicking any playlist inside `Sorted (Key+BPM)/` — tracks should run `1A` (lowest BPM) → `1B` → `2A` → … → `12B` (highest BPM).
+7. **Drag** the playlists you want from `Sorted (Key+BPM)/` into your main `Playlists` collection. Your original playlists (still in `Playlists`) are unchanged.
 8. **Export to USB for CDJ**: switch Rekordbox to *EXPORT* mode (top-left dropdown), plug in your USB / SD, then **right-click the playlist → Export Playlist**. CDJs read tracks in playlist order by default — your Key+BPM sort plays back on the deck in that exact order.
 
-> The sorted result lives **only** inside the `rekordbox xml` tree, not in your main `Playlists`. If you only see the original (unsorted) playlist, you're looking at the local library — switch sidebar trees.
+> The sorted results live **only** inside the `rekordbox xml > Sorted (Key+BPM)/` folder, not in your main `Playlists`. If you only see the originals, you're looking at the local library — switch sidebar trees.
 
 ### Flags
 
 | Flag | Description |
 |------|-------------|
 | `--xml <PATH>` | Path to `collection.xml` (required) |
-| `--playlist <PATH>` | Source playlist path, '/'-separated (e.g. `"Folder/MyPlaylist"`) |
-| `--output <PATH>` (`-o`) | Output XML path (required) |
-| `--name <NAME>` | Name for the new sorted playlist. Default: `<source> (Key+BPM)` |
+| `--playlist <PATH>` | Source playlist under the Rekordbox `Playlists` root. **Optional** — if omitted, every TrackID-referenced playlist in the XML is sorted. Top-level playlists: just the name (e.g. `"Happy House and Trance"`). Nested: `/`-separate folder/playlist names (e.g. `"Folder/SubFolder/MyPlaylist"`) |
+| `--output <PATH>` (`-o`) | Output XML path. Optional — defaults to `<input-stem>-out.<ext>` next to the input |
+| `--name <NAME>` | Override the sorted playlist's name. Only valid with `--playlist`. When sorting all playlists, each sorted copy reuses its source name |
 
 ### Sort rules
 
@@ -281,9 +290,9 @@ This is the same idea as headroom's analyzer applied to playlist order: Rekordbo
 ### Notes
 
 - Requires the `Tonality` field to be exported as 1A..12B (Rekordbox's "Alphanumeric" key display format). Non-matching values (e.g. `Am`, `C#`) are silently sorted last.
-- Only `KeyType="0"` (TrackID-referenced) playlists are supported.
+- Only `KeyType="0"` (TrackID-referenced) playlists are supported. In all-playlists mode, non-`KeyType=0` playlists are silently skipped; for a single target, `rbsort` errors out.
 - `rbsort` does **not** require ffmpeg — only the analyzer subcommand does.
-- The new playlist is appended inside the same `<PLAYLISTS>` ROOT NODE; the ROOT `Count` attribute is incremented automatically.
+- A single `Sorted (Key+BPM)/` folder is appended inside the `<PLAYLISTS>` ROOT NODE, regardless of how many playlists were processed. The ROOT `Count` is bumped by 1.
 
 ## Output
 
