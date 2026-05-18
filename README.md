@@ -242,6 +242,8 @@ Run `headroom --help` for the full flag reference.
 
 Rekordbox does not expose a "sort by Key AND BPM" option in its UI. `headroom rbsort` reads your `collection.xml`, sorts a target playlist by **Camelot Key (1A → 12B) ascending** then **BPM ascending**, and appends the result as a new playlist node to the same XML. The original playlist is left untouched.
 
+This is the same idea as headroom's analyzer applied to playlist order: Rekordbox's software-only features (Auto Gain, multi-column sort) don't follow your tracks to the CDJ. `rbsort` bakes Key+BPM order into the playlist itself — so when you export to USB in Rekordbox's EXPORT mode, the CDJ plays the set in that exact order with no on-deck reordering.
+
 ### Workflow
 
 1. **Set key display to Alphanumeric (1A..12B notation)** in Rekordbox: *Preferences > View > Key display format > Alphanumeric*.
@@ -256,7 +258,8 @@ Rekordbox does not expose a "sort by Key AND BPM" option in its UI. `headroom rb
 4. **Point Rekordbox at the output XML**: *Preferences > Advanced > Database > rekordbox xml > Imported Library* → select `sorted.xml`, then **restart Rekordbox** (Rekordbox only re-reads the XML on startup).
 5. **Open the `rekordbox xml` tree** in the left sidebar. It is a *separate* tree from your main library — switch to it from the **sidebar icon column** on the far left (the icon labeled `rekordbox xml`). Inside you'll find `rekordbox xml > Playlists > Sets/Friday (Key+BPM)`.
 6. **Verify the sort** by clicking the new playlist — tracks should run `1A` (lowest BPM) → `1B` → `2A` → … → `12B` (highest BPM).
-7. **Drag** the sorted playlist from the `rekordbox xml` tree into your main `Playlists` collection to use it in your sets. Your original playlist (still in `Playlists`) is unchanged.
+7. **Drag** the sorted playlist from the `rekordbox xml` tree into your main `Playlists` collection. Your original playlist (still in `Playlists`) is unchanged.
+8. **Export to USB for CDJ**: switch Rekordbox to *EXPORT* mode (top-left dropdown), plug in your USB / SD, then **right-click the playlist → Export Playlist**. CDJs read tracks in playlist order by default — your Key+BPM sort plays back on the deck in that exact order.
 
 > The sorted result lives **only** inside the `rekordbox xml` tree, not in your main `Playlists`. If you only see the original (unsorted) playlist, you're looking at the local library — switch sidebar trees.
 
