@@ -31,6 +31,10 @@ pub fn run(args: &RbsortArgs) -> Result<()> {
         "  {} Import via Rekordbox: Preferences > Advanced > Database > rekordbox xml",
         style("ℹ").blue()
     );
+    println!(
+        "  {} Restart Rekordbox, then open the 'rekordbox xml' tree in the left sidebar",
+        style("ℹ").blue()
+    );
     Ok(())
 }
 

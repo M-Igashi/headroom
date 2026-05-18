@@ -253,8 +253,12 @@ Rekordbox does not expose a "sort by Key AND BPM" option in its UI. `headroom rb
      --playlist "Sets/Friday" \
      --output ~/Music/rekordbox/sorted.xml
    ```
-4. **Import the result back into Rekordbox**: *Preferences > Advanced > Database > rekordbox xml > Imported Library* → select `sorted.xml`. A "rekordbox xml" tree appears in the left sidebar.
-5. **Drag** the new `Sets/Friday (Key+BPM)` playlist from the imported tree into your real collection.
+4. **Point Rekordbox at the output XML**: *Preferences > Advanced > Database > rekordbox xml > Imported Library* → select `sorted.xml`, then **restart Rekordbox** (Rekordbox only re-reads the XML on startup).
+5. **Open the `rekordbox xml` tree** in the left sidebar. It is a *separate* tree from your main library — switch to it from the **sidebar icon column** on the far left (the icon labeled `rekordbox xml`). Inside you'll find `rekordbox xml > Playlists > Sets/Friday (Key+BPM)`.
+6. **Verify the sort** by clicking the new playlist — tracks should run `1A` (lowest BPM) → `1B` → `2A` → … → `12B` (highest BPM).
+7. **Drag** the sorted playlist from the `rekordbox xml` tree into your main `Playlists` collection to use it in your sets. Your original playlist (still in `Playlists`) is unchanged.
+
+> The sorted result lives **only** inside the `rekordbox xml` tree, not in your main `Playlists`. If you only see the original (unsorted) playlist, you're looking at the local library — switch sidebar trees.
 
 ### Flags
 
