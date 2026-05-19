@@ -287,6 +287,8 @@ This is the same idea as headroom's analyzer applied to playlist order: Rekordbo
 - **Secondary**: BPM ascending within each key group
 - Tracks with no Camelot key sort **after** all known keys; within a key group, tracks with BPM 0 / unanalyzed sort last
 
+See [docs/rbsort-sort-comparison.md](docs/rbsort-sort-comparison.md) for a 6-track walk-through showing how this compound sort differs from Rekordbox / CDJ's single-column *Sort by Key* and *Sort by BPM*.
+
 ### Notes
 
 - Requires the `Tonality` field to be exported as 1A..12B (Rekordbox's "Alphanumeric" key display format). Non-matching values (e.g. `Am`, `C#`) are silently sorted last.
