@@ -1,6 +1,8 @@
 # headroom
 
-A toolkit for Rekordbox DJ workflows: loudness normalization for CDJ export, plus a Rekordbox XML playlist sorter for harmonic mixing.
+**Built for the Rekordbox → CDJ workflow.**
+
+Rekordbox's Auto Gain and multi-column sort live only inside the software — they don't survive the USB export to your CDJs. headroom bakes loudness gain and Camelot Key + BPM playlist order into the files themselves, so what you prep in Rekordbox is what plays on the deck.
 
 ## What is this?
 
@@ -22,69 +24,30 @@ This tool is designed for DJs and producers who want to maximize loudness while 
 - **Scriptable CLI**: Non-interactive mode for pipelines and CI (paths, globs, and flags)
 - **Rekordbox playlist sorter** *(v2.0+)*: `headroom rbsort` produces a new playlist sorted by Camelot Key then BPM
 
-## Processing Methods
+## Installation
 
-headroom selects the optimal method for each file based on format and headroom:
+headroom requires ffmpeg. Package managers install it automatically.
 
-| Format | Method | Precision | Quality Loss |
-|--------|--------|-----------|--------------|
-| FLAC, AIFF, WAV | ffmpeg | Arbitrary | None |
-| MP3, AAC/M4A | mp3rgain (built-in) | 1.5dB steps | **None** (global_gain modification) |
-| MP3, AAC/M4A | ffmpeg re-encode | Arbitrary | Inaudible at ≥256kbps |
+| Platform | Command |
+|----------|---------|
+| **macOS (Homebrew)** | `brew install M-Igashi/tap/headroom` |
+| **Windows (winget)** | `winget install M-Igashi.headroom` |
+| **Arch Linux (AUR)** | `yay -S headroom-bin` |
+| **Cargo** | `cargo install headroom` (ffmpeg must be installed separately) |
 
-### Three-Tier Approach for Lossy Formats (MP3/AAC)
+Pre-built binaries are available on the [Releases](https://github.com/M-Igashi/headroom/releases) page (ffmpeg must be installed separately).
 
-Each MP3 and AAC/M4A file is categorized into one of three tiers:
+### Build from Source
 
-1. **Native Lossless** — ≥1.5 dB headroom to the configured ceiling
-   - Truly lossless global_gain header modification in 1.5dB steps
-   - Uses built-in [mp3rgain](https://github.com/M-Igashi/mp3rgain) library
-   - Applied automatically (no user confirmation needed)
+```bash
+git clone https://github.com/M-Igashi/headroom.git
+cd headroom
+cargo build --release
+```
 
-2. **Re-encode** — headroom exists but <1.5 dB to ceiling
-   - Uses ffmpeg for arbitrary precision gain
-   - MP3: `libmp3lame` with `-q:a 0` / AAC: `libfdk_aac` (falls back to built-in `aac`)
-   - Preserves original bitrate; requires explicit user confirmation
+## Loudness Normalizer
 
-3. **Skip** — no headroom available
-
-## True Peak Ceiling
-
-### Default — uniform delivery target
-
-Every file targets **-0.5 dBTP** by default. This is the maximum-aggression value that [AES TD1008](https://www.aes.org/technical/documentDownloads.cfm?docID=731) §7B describes for high-rate codec inputs ("may work satisfactorily with as little as -0.5 dBTP for the limiting threshold").
-
-| File class | Ceiling | Native lossless requires |
-|---|---|---|
-| Lossless (FLAC, AIFF, WAV) | **-0.5 dBTP** | — |
-| MP3 (any bitrate) | **-0.5 dBTP** | TP ≤ -2.0 dBTP |
-| AAC/M4A (any bitrate) | **-0.5 dBTP** | TP ≤ -2.0 dBTP |
-
-### Why a single ceiling — pre-encode vs delivery
-
-TD1008 has two related but distinct numbers:
-
-1. **Generic delivery recommendation (§4)** — "Maximum True Peak level not exceed -1 dBTP at the codec input of lossy-encoded streams." This is the *pre-encode* limiter threshold.
-2. **High-rate codec relaxation (§7B)** — "High-rate (e.g., 256 kbps) coders may work satisfactorily with as little as -0.5 dBTP" — also a *codec-input* threshold; "the limiting threshold may need to be reduced below the recommended -1.0 dBTP" for lower bit rates.
-
-Both bullets describe the *limiter that sits in front of the encoder*. headroom operates in the opposite position: on **already-encoded delivery files**. There is no further codec stage downstream to absorb additional overshoot, so the bitrate-dependent slack TD1008 grants the pre-encode limiter does not transfer to the end product. A single, codec-agnostic delivery ceiling is the correct interpretation. -0.5 dBTP is chosen because it is the most aggressive value TD1008 sanctions for any limiter in the chain; lossless and high-rate lossy files were already at -0.5, and low-rate files now stop giving up an unnecessary 0.5 dB of loudness.
-
-See [docs/true-peak-ceiling.md](docs/true-peak-ceiling.md) for a longer walk-through with citations.
-
-### Tuning the ceiling
-
-| Goal | Flag | Resulting ceiling |
-|---|---|---|
-| Default (max-aggressive delivery) | *(none)* | -0.5 dBTP for all files |
-| Match Spotify / Apple Music / YouTube delivery max | `--tp-target -1.0` | -1.0 dBTP for all files |
-| Conservative master with extra player headroom | `--tp-target -2.0` | -2.0 dBTP for all files |
-| Mirror TD1008's pre-encode interpretation | `--tp-split-bitrate` | -0.5 dBTP ≥256 kbps, -1.0 dBTP <256 kbps |
-
-`--tp-target` and `--tp-split-bitrate` are mutually exclusive. `--tp-split-bitrate` reproduces headroom's pre-1.10 default exactly.
-
-The native-lossless threshold scales with the chosen ceiling: it is always `target − 1.5 dB` (e.g. `-0.5` → TP ≤ -2.0; `-1.0` → TP ≤ -2.5; `-2.0` → TP ≤ -3.5).
-
-## How It Works
+### How It Works
 
 1. Scans the current directory for audio files (FLAC, AIFF, WAV, MP3, AAC/M4A)
 2. Measures LUFS (Integrated Loudness) and True Peak using ffmpeg
@@ -98,7 +61,7 @@ The native-lossless threshold scales with the chosen ceiling: it is always `targ
    - Second: "Also process files with re-encoding?" (MP3/AAC requiring re-encode)
 6. Creates backups and processes files
 
-### Example
+#### Example
 
 ```
 $ cd ~/Music/DJ-Tracks
@@ -161,30 +124,9 @@ $ headroom
   • 1 AAC/M4A files (re-encoded)
 ```
 
-## Installation
+### Usage
 
-headroom requires ffmpeg. Package managers install it automatically.
-
-| Platform | Command |
-|----------|---------|
-| **macOS (Homebrew)** | `brew install M-Igashi/tap/headroom` |
-| **Windows (winget)** | `winget install M-Igashi.headroom` |
-| **Arch Linux (AUR)** | `yay -S headroom-bin` |
-| **Cargo** | `cargo install headroom` (ffmpeg must be installed separately) |
-
-Pre-built binaries are available on the [Releases](https://github.com/M-Igashi/headroom/releases) page (ffmpeg must be installed separately).
-
-### Build from Source
-
-```bash
-git clone https://github.com/M-Igashi/headroom.git
-cd headroom
-cargo build --release
-```
-
-## Usage
-
-### Interactive Mode
+#### Interactive Mode
 
 Run without arguments to use the guided workflow in the current directory:
 
@@ -200,7 +142,7 @@ The tool will guide you through:
 4. Optionally enabling MP3/AAC re-encoding
 5. Creating backups (recommended)
 
-### Scriptable Mode
+#### Scriptable Mode
 
 Pass paths, globs, or flags to run non-interactively (useful for pipelines and scripts):
 
@@ -235,6 +177,127 @@ headroom --lossless --tp-split-bitrate ./album/
 - `--analyze-only` runs analysis + report only, skips processing
 
 Run `headroom --help` for the full flag reference.
+
+### Processing Methods
+
+headroom selects the optimal method for each file based on format and headroom:
+
+| Format | Method | Precision | Quality Loss |
+|--------|--------|-----------|--------------|
+| FLAC, AIFF, WAV | ffmpeg | Arbitrary | None |
+| MP3, AAC/M4A | mp3rgain (built-in) | 1.5dB steps | **None** (global_gain modification) |
+| MP3, AAC/M4A | ffmpeg re-encode | Arbitrary | Inaudible at ≥256kbps |
+
+#### Three-Tier Approach for Lossy Formats (MP3/AAC)
+
+Each MP3 and AAC/M4A file is categorized into one of three tiers:
+
+1. **Native Lossless** — ≥1.5 dB headroom to the configured ceiling
+   - Truly lossless global_gain header modification in 1.5dB steps
+   - Uses built-in [mp3rgain](https://github.com/M-Igashi/mp3rgain) library
+   - Applied automatically (no user confirmation needed)
+
+2. **Re-encode** — headroom exists but <1.5 dB to ceiling
+   - Uses ffmpeg for arbitrary precision gain
+   - MP3: `libmp3lame` with `-q:a 0` / AAC: `libfdk_aac` (falls back to built-in `aac`)
+   - Preserves original bitrate; requires explicit user confirmation
+
+3. **Skip** — no headroom available
+
+### True Peak Ceiling
+
+#### Default — uniform delivery target
+
+Every file targets **-0.5 dBTP** by default. This is the maximum-aggression value that [AES TD1008](https://www.aes.org/technical/documentDownloads.cfm?docID=731) §7B describes for high-rate codec inputs ("may work satisfactorily with as little as -0.5 dBTP for the limiting threshold").
+
+| File class | Ceiling | Native lossless requires |
+|---|---|---|
+| Lossless (FLAC, AIFF, WAV) | **-0.5 dBTP** | — |
+| MP3 (any bitrate) | **-0.5 dBTP** | TP ≤ -2.0 dBTP |
+| AAC/M4A (any bitrate) | **-0.5 dBTP** | TP ≤ -2.0 dBTP |
+
+#### Why a single ceiling — pre-encode vs delivery
+
+TD1008 has two related but distinct numbers:
+
+1. **Generic delivery recommendation (§4)** — "Maximum True Peak level not exceed -1 dBTP at the codec input of lossy-encoded streams." This is the *pre-encode* limiter threshold.
+2. **High-rate codec relaxation (§7B)** — "High-rate (e.g., 256 kbps) coders may work satisfactorily with as little as -0.5 dBTP" — also a *codec-input* threshold; "the limiting threshold may need to be reduced below the recommended -1.0 dBTP" for lower bit rates.
+
+Both bullets describe the *limiter that sits in front of the encoder*. headroom operates in the opposite position: on **already-encoded delivery files**. There is no further codec stage downstream to absorb additional overshoot, so the bitrate-dependent slack TD1008 grants the pre-encode limiter does not transfer to the end product. A single, codec-agnostic delivery ceiling is the correct interpretation. -0.5 dBTP is chosen because it is the most aggressive value TD1008 sanctions for any limiter in the chain; lossless and high-rate lossy files were already at -0.5, and low-rate files now stop giving up an unnecessary 0.5 dB of loudness.
+
+See [docs/true-peak-ceiling.md](docs/true-peak-ceiling.md) for a longer walk-through with citations.
+
+#### Tuning the ceiling
+
+| Goal | Flag | Resulting ceiling |
+|---|---|---|
+| Default (max-aggressive delivery) | *(none)* | -0.5 dBTP for all files |
+| Match Spotify / Apple Music / YouTube delivery max | `--tp-target -1.0` | -1.0 dBTP for all files |
+| Conservative master with extra player headroom | `--tp-target -2.0` | -2.0 dBTP for all files |
+| Mirror TD1008's pre-encode interpretation | `--tp-split-bitrate` | -0.5 dBTP ≥256 kbps, -1.0 dBTP <256 kbps |
+
+`--tp-target` and `--tp-split-bitrate` are mutually exclusive. `--tp-split-bitrate` reproduces headroom's pre-1.10 default exactly.
+
+The native-lossless threshold scales with the chosen ceiling: it is always `target − 1.5 dB` (e.g. `-0.5` → TP ≤ -2.0; `-1.0` → TP ≤ -2.5; `-2.0` → TP ≤ -3.5).
+
+### Output
+
+#### CSV Report
+
+| Filename | Format | Bitrate (kbps) | LUFS | True Peak (dBTP) | Target (dBTP) | Headroom (dB) | Method | Effective Gain (dB) |
+|----------|--------|----------------|------|------------------|---------------|---------------|--------|---------------------|
+| track01.flac | Lossless | - | -13.3 | -3.2 | -0.5 | +2.7 | ffmpeg | +2.7 |
+| track04.mp3 | MP3 | 320 | -14.0 | -5.5 | -0.5 | +5.0 | mp3rgain | +4.5 |
+| track06.mp3 | MP3 | 320 | -12.0 | -1.5 | -0.5 | +1.0 | re-encode | +1.0 |
+| track08.m4a | AAC | 256 | -13.0 | -4.0 | -0.5 | +3.5 | native | +3.0 |
+| track10.m4a | AAC | 256 | -12.5 | -1.8 | -0.5 | +0.7 | re-encode | +0.7 |
+
+#### Backup Structure
+
+```
+./
+├── track01.flac             ← Modified
+├── track04.mp3              ← Modified
+├── track08.m4a              ← Modified
+├── subfolder/
+│   └── track06.mp3          ← Modified
+└── backup/                  ← Created by headroom
+    ├── track01.flac         ← Original
+    ├── track04.mp3          ← Original
+    ├── track08.m4a          ← Original
+    └── subfolder/
+        └── track06.mp3      ← Original
+```
+
+### Notes & Technical Details
+
+- **Files are overwritten in place** after backup — Rekordbox metadata remains linked
+- Only files with **positive effective gain** are shown and processed
+- MP3/AAC native lossless requires at least **1.5dB headroom** to be processed
+- MP3/AAC re-encoding is **opt-in** and requires explicit confirmation
+- macOS resource fork files (`._*`) are automatically ignored
+
+#### Why 1.5dB Steps?
+
+Both MP3 and AAC store a "global_gain" value as an integer. Each ±1 increment changes the gain by `2^(1/4)` = **±1.5 dB**. This is a format-level constraint, not a tool limitation.
+
+headroom uses the built-in [mp3rgain](https://github.com/M-Igashi/mp3rgain) library to directly modify this field — no decoding or re-encoding involved.
+
+#### Native Lossless Threshold
+
+Since native lossless gain only works in 1.5 dB steps, at least 1.5 dB of headroom to the configured target ceiling is required. The threshold scales automatically:
+
+| Target | Requires TP ≤ |
+|---|---|
+| -0.5 dBTP (default) | -2.0 dBTP |
+| -1.0 dBTP (`--tp-target -1.0`) | -2.5 dBTP |
+| -2.0 dBTP (`--tp-target -2.0`) | -3.5 dBTP |
+
+Example: 320 kbps file at -3.5 dBTP, default target → 2 steps (+3.0 dB) → -0.5 dBTP (optimal).
+
+#### Re-encode Quality
+
+At ≥256kbps, re-encoding introduces quantization noise below -90dB — far below audible threshold. Only gain is applied (no EQ, compression, or dynamics processing), and original bitrate is preserved.
 
 ## Rekordbox Playlist Sorter (`rbsort`)
 
@@ -281,7 +344,7 @@ This is the same idea as headroom's analyzer applied to playlist order: Rekordbo
 | `--output <PATH>` (`-o`) | Output XML path. Optional — defaults to `<input-stem>-out.<ext>` next to the input |
 | `--name <NAME>` | Override the sorted playlist's name. Only valid with `--playlist`. When sorting all playlists, each sorted copy reuses its source name |
 
-### Sort rules
+### Sort Rules
 
 - **Primary**: Camelot Key ascending — `1A → 1B → 2A → 2B → … → 12A → 12B`
 - **Secondary**: BPM ascending within each key group
@@ -295,67 +358,6 @@ See [docs/rbsort-sort-comparison.md](docs/rbsort-sort-comparison.md) for a 6-tra
 - Only `KeyType="0"` (TrackID-referenced) playlists are supported. In all-playlists mode, non-`KeyType=0` playlists are silently skipped; for a single target, `rbsort` errors out.
 - `rbsort` does **not** require ffmpeg — only the analyzer subcommand does.
 - A single `Sorted (Key+BPM)/` folder is appended inside the `<PLAYLISTS>` ROOT NODE, regardless of how many playlists were processed. The ROOT `Count` is bumped by 1.
-
-## Output
-
-### CSV Report
-
-| Filename | Format | Bitrate (kbps) | LUFS | True Peak (dBTP) | Target (dBTP) | Headroom (dB) | Method | Effective Gain (dB) |
-|----------|--------|----------------|------|------------------|---------------|---------------|--------|---------------------|
-| track01.flac | Lossless | - | -13.3 | -3.2 | -0.5 | +2.7 | ffmpeg | +2.7 |
-| track04.mp3 | MP3 | 320 | -14.0 | -5.5 | -0.5 | +5.0 | mp3rgain | +4.5 |
-| track06.mp3 | MP3 | 320 | -12.0 | -1.5 | -0.5 | +1.0 | re-encode | +1.0 |
-| track08.m4a | AAC | 256 | -13.0 | -4.0 | -0.5 | +3.5 | native | +3.0 |
-| track10.m4a | AAC | 256 | -12.5 | -1.8 | -0.5 | +0.7 | re-encode | +0.7 |
-
-### Backup Structure
-
-```
-./
-├── track01.flac             ← Modified
-├── track04.mp3              ← Modified
-├── track08.m4a              ← Modified
-├── subfolder/
-│   └── track06.mp3          ← Modified
-└── backup/                  ← Created by headroom
-    ├── track01.flac         ← Original
-    ├── track04.mp3          ← Original
-    ├── track08.m4a          ← Original
-    └── subfolder/
-        └── track06.mp3      ← Original
-```
-
-## Important Notes
-
-- **Files are overwritten in place** after backup — Rekordbox metadata remains linked
-- Only files with **positive effective gain** are shown and processed
-- MP3/AAC native lossless requires at least **1.5dB headroom** to be processed
-- MP3/AAC re-encoding is **opt-in** and requires explicit confirmation
-- macOS resource fork files (`._*`) are automatically ignored
-
-## Technical Details
-
-### Why 1.5dB Steps?
-
-Both MP3 and AAC store a "global_gain" value as an integer. Each ±1 increment changes the gain by `2^(1/4)` = **±1.5 dB**. This is a format-level constraint, not a tool limitation.
-
-headroom uses the built-in [mp3rgain](https://github.com/M-Igashi/mp3rgain) library to directly modify this field — no decoding or re-encoding involved.
-
-### Native Lossless Threshold
-
-Since native lossless gain only works in 1.5 dB steps, at least 1.5 dB of headroom to the configured target ceiling is required. The threshold scales automatically:
-
-| Target | Requires TP ≤ |
-|---|---|
-| -0.5 dBTP (default) | -2.0 dBTP |
-| -1.0 dBTP (`--tp-target -1.0`) | -2.5 dBTP |
-| -2.0 dBTP (`--tp-target -2.0`) | -3.5 dBTP |
-
-Example: 320 kbps file at -3.5 dBTP, default target → 2 steps (+3.0 dB) → -0.5 dBTP (optimal).
-
-### Re-encode Quality
-
-At ≥256kbps, re-encoding introduces quantization noise below -90dB — far below audible threshold. Only gain is applied (no EQ, compression, or dynamics processing), and original bitrate is preserved.
 
 ## License
 
