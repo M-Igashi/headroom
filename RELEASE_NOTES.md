@@ -1,85 +1,31 @@
-# headroom 2.0.0 — `rbsort` ships
+# headroom 2.1.0 — AI-assisted hardening & performance
 
-This is the first major-version bump since the project began. **headroom** is no longer just a loudness analyzer: it now has a CLI subcommand surface, and the inaugural subcommand `rbsort` ships in this release.
-
-All v1.x loudness behaviour is **100% backward-compatible** — `headroom <paths>` and bare-invocation interactive mode are unchanged.
+A reliability and performance release. The codebase was systematically audited with **Claude (Fable 5)**, which uncovered several latent bugs — including one that could silently modify your backups — all fixed here, alongside a round of performance work. No new flags, no breaking changes: existing commands behave the same, just safer and faster.
 
 ---
 
-## Headliner: `rbsort` — Rekordbox playlist sorter for harmonic mixing
+## Latent bugs found & fixed (Claude Fable 5 audit)
 
-A pure XML-in / XML-out workflow. Takes a Rekordbox **collection.xml** export and produces a key/tempo-sorted copy ready to re-import. No audio is touched, no database is written, **ffmpeg is not required**.
+- **Backups are no longer re-processed** (#45). The default backup directory `<target>/backup` lives inside the scan root, so a second run would pick the backup copies up and gain-adjust them too — defeating the purpose of a backup. Backup directories created by headroom now contain a `.headroom-backup` marker file and are skipped during recursive scans. Explicitly pointing headroom at a backup directory still works. *Note: backups created by older versions are unmarked; re-running with `--backup` marks the default location going forward.*
+- **Silent audio no longer saturates the gain math.** ffmpeg's loudnorm reports `-inf` for silent files, which previously overflowed into `i32::MAX` gain steps. Non-finite measurements are now rejected with a clear per-file error.
+- **Backup path edge case.** With mixed-root inputs, `strip_prefix` could yield an absolute or empty relative path, making the backup copy target the source file itself. Now guarded with a bare-filename fallback.
+- **Report column alignment.** Columns are padded before ANSI styles are applied, fixing misaligned analysis tables.
 
-### What it does
+## Performance
 
-Sorts a target playlist — **or every TrackID-referenced playlist in the XML** — by:
+- **Parallel gain processing.** File processing now runs in parallel via rayon (analysis already did), cutting wall-clock time on multi-file batches.
+- **One less process per lossy file** (#47). The bitrate is parsed from the loudnorm run's existing ffmpeg output instead of spawning a separate ffprobe for every MP3/AAC file; ffprobe remains as a fallback.
+- **Startup is never blocked by the update check** (#46). The version check runs on a background thread with a 3-second timeout, and the upgrade hint now prints *after* the run — where you'll actually see it.
 
-1. **Camelot Key** ascending (`1A` → `1B` → `2A` → … → `12B`)
-2. **BPM** ascending within each key group
+## Other changes
 
-Sorted copies are written into a brand-new `Sorted (Key+BPM)/` folder appended to the ROOT node, each playlist keeping its source name. Mirrors the analyzer's existing `backup/` directory pattern.
-
-Tracks with no Camelot key sort after all known keys; within a key group, tracks with no/0 BPM sort last.
-
-### Usage
-
-```bash
-# Sort *every* TrackID-referenced playlist in one pass (recommended)
-headroom rbsort --xml /path/to/collection.xml
-
-# Sort a single playlist with a custom name
-headroom rbsort \
-  --xml /path/to/collection.xml \
-  --playlist "Folder/MyPlaylist" \
-  --output sorted.xml \
-  --name "MyPlaylist (Camelot+BPM)"
-```
-
-Defaults:
-
-| Flag         | Behaviour when omitted                                                  |
-|--------------|-------------------------------------------------------------------------|
-| `--output`   | `<input-stem>-out.<ext>` next to the input (e.g. `coll.xml` → `coll-out.xml`) |
-| `--playlist` | Sort **every** TrackID-referenced (`KeyType="0"`) playlist in the XML   |
-
-### Rekordbox workflow
-
-1. **Preferences > View > Key display format → Alphanumeric** so `Tonality` exports as Camelot (`1A`..`12B`). Non-Camelot tonalities silently sort last.
-2. **File > Export Collection in xml format** → `collection.xml`.
-3. Run `headroom rbsort --xml collection.xml`.
-4. **Preferences > Advanced > Database > rekordbox xml → Imported Library** points at the output XML; restart Rekordbox.
-5. Open the **rekordbox xml** tree in the left sidebar; drag the sorted playlist into your real Playlists tree, or right-click → **Export Playlist** for CDJ EXPORT mode.
-
-### Implementation highlights
-
-- New module `src/rbsort/` (`mod`, `camelot`, `xml`) on top of `quick-xml` 0.40.
-- Two-pass design: scan `COLLECTION` + target playlists, then stream-rewrite with the sorted folder injected inside `<PLAYLISTS>` before the ROOT `</NODE>` closes. ROOT `Count` is bumped by 1.
-- Robust against real Rekordbox exports — `<TRACK>` elements with nested `<TEMPO>` / `<POSITION_MARK>` children are handled correctly (the original `Event::Empty`-only path produced an empty collection map and a no-op sort).
-- Subcommand dispatch short-circuits **before** the audio pipeline, the banner, ffmpeg check, and the update check — `rbsort` runs in milliseconds and has zero audio-stack dependencies.
-- Verified end-to-end on a real 5,255-track / 24-playlist Rekordbox export — sorted in under a second with zero ordering violations.
-
----
-
-## Why a major version?
-
-Until now, `headroom` only did one thing: audio loudness analysis and gain adjustment. v2.0.0 introduces a **subcommand surface** to the CLI, and `rbsort` is the first to land there. Future non-audio DJ-prep workflows (set planning, transition analysis, etc.) will be added as subcommands too.
-
-Existing flows are untouched:
-
-- `headroom`                   → interactive loudness analyzer (unchanged)
-- `headroom <paths> [flags]`   → scriptable loudness analyzer (unchanged)
-- `headroom rbsort ...`        → **new** Rekordbox playlist sorter
-
----
-
-## Internal
-
-- XML scanner/rewriter switched to byte-level element-name comparison and single-pass attribute extraction — fewer allocations on large exports.
-- `Option<T>` "None-last" ordering extracted into a reusable helper.
-- `processor.rs` internal helpers tightened from `pub` to private; dead `AnalysisSummary::total()` removed.
-- `default_output_path` simplified to use `Path::with_file_name`.
-- 19 unit tests, including full XML round-trip with multi-playlist nested folders.
+- Refactor: per-format gain wrappers merged into a single `LossyFormat` enum
+- Docs: rbsort sort-comparison write-up (`docs/rbsort-sort-comparison.md`), README updates
+- Dependencies: mp3rgain 2.7.0 → 2.8.0, chrono 0.4.45, serde_json bump
+- CI: actions/checkout pinned to v6.0.3
 
 ## Migration
 
-**None.** The audio side is wire-compatible with v1.x. `rbsort` is purely additive.
+**None.** Fully backward-compatible with v2.0.x.
+
+---
