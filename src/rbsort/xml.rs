@@ -4,7 +4,6 @@ use quick_xml::reader::Reader;
 use quick_xml::writer::Writer;
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::io::Cursor;
 use std::path::Path;
 
 use super::camelot::parse_camelot;
@@ -96,10 +95,10 @@ fn select_targets(
 }
 
 fn scan_xml(xml_data: &[u8]) -> Result<(HashMap<String, TrackMeta>, Vec<CollectedPlaylist>)> {
-    let mut reader = Reader::from_reader(Cursor::new(xml_data));
+    // Slice reader: events borrow from xml_data (zero-copy, no per-event buffer).
+    let mut reader = Reader::from_reader(xml_data);
     reader.config_mut().trim_text(false);
 
-    let mut buf = Vec::new();
     let mut in_collection = false;
     let mut in_playlists = false;
     let mut path_stack: Vec<String> = Vec::new();
@@ -108,10 +107,15 @@ fn scan_xml(xml_data: &[u8]) -> Result<(HashMap<String, TrackMeta>, Vec<Collecte
     let mut playlists: Vec<CollectedPlaylist> = Vec::new();
 
     loop {
-        match reader.read_event_into(&mut buf) {
+        match reader.read_event() {
             Ok(Event::Eof) => break,
             Ok(Event::Start(e)) => match e.name().as_ref() {
-                b"COLLECTION" => in_collection = true,
+                b"COLLECTION" => {
+                    in_collection = true;
+                    if let Some(n) = get_attr(&e, "Entries")?.and_then(|v| v.parse().ok()) {
+                        collection.reserve(n);
+                    }
+                }
                 b"PLAYLISTS" => in_playlists = true,
                 b"NODE" if in_playlists => {
                     let (name, ty, key_type) = playlist_node_attrs(&e)?;
@@ -176,7 +180,6 @@ fn scan_xml(xml_data: &[u8]) -> Result<(HashMap<String, TrackMeta>, Vec<Collecte
             ),
             _ => {}
         }
-        buf.clear();
     }
 
     Ok((collection, playlists))
@@ -269,24 +272,24 @@ fn sort_tracks(track_ids: &[String], collection: &HashMap<String, TrackMeta>) ->
 }
 
 fn rewrite_xml(xml_data: &[u8], playlists: &[SortedPlaylist]) -> Result<Vec<u8>> {
-    let mut reader = Reader::from_reader(Cursor::new(xml_data));
+    // Slice reader + borrowed events: stream-copy without duplicating each event.
+    let mut reader = Reader::from_reader(xml_data);
     reader.config_mut().trim_text(false);
 
     let mut output: Vec<u8> = Vec::with_capacity(xml_data.len() + 4096);
     {
-        let mut writer = Writer::new(Cursor::new(&mut output));
-        let mut buf = Vec::new();
+        let mut writer = Writer::new(&mut output);
         let mut in_playlists = false;
         let mut playlists_depth: i32 = 0;
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(Event::Eof) => break,
                 Ok(Event::Start(e)) => match e.name().as_ref() {
                     b"PLAYLISTS" => {
                         in_playlists = true;
                         playlists_depth = 0;
-                        writer.write_event(Event::Start(e.into_owned()))?;
+                        writer.write_event(Event::Start(e))?;
                     }
                     b"NODE" if in_playlists => {
                         playlists_depth += 1;
@@ -308,10 +311,10 @@ fn rewrite_xml(xml_data: &[u8], playlists: &[SortedPlaylist]) -> Result<Vec<u8>>
                             }
                             writer.write_event(Event::Start(new_start))?;
                         } else {
-                            writer.write_event(Event::Start(e.into_owned()))?;
+                            writer.write_event(Event::Start(e))?;
                         }
                     }
-                    _ => writer.write_event(Event::Start(e.into_owned()))?,
+                    _ => writer.write_event(Event::Start(e))?,
                 },
                 Ok(Event::End(e)) => match e.name().as_ref() {
                     b"NODE" if in_playlists => {
@@ -319,20 +322,19 @@ fn rewrite_xml(xml_data: &[u8], playlists: &[SortedPlaylist]) -> Result<Vec<u8>>
                             emit_sorted_folder(&mut writer, playlists)?;
                         }
                         playlists_depth -= 1;
-                        writer.write_event(Event::End(e.into_owned()))?;
+                        writer.write_event(Event::End(e))?;
                     }
                     b"PLAYLISTS" => {
                         in_playlists = false;
-                        writer.write_event(Event::End(e.into_owned()))?;
+                        writer.write_event(Event::End(e))?;
                     }
-                    _ => writer.write_event(Event::End(e.into_owned()))?,
+                    _ => writer.write_event(Event::End(e))?,
                 },
                 Ok(other) => {
                     writer.write_event(other)?;
                 }
                 Err(e) => bail!("XML rewrite error: {}", e),
             }
-            buf.clear();
         }
     }
     Ok(output)
